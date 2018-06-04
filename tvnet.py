@@ -20,7 +20,7 @@ class TVNet(nn.Module):
         self.height, self.width = img_size
         n_scales = 1 + np.log(np.sqrt(height ** 2 + width ** 2) / 4.0) / np.log(1 / self.zfactor)
         self.n_scales = min(n_scales, self.max_scales)
-        
+
         tvnet = nn.ModuleList()
 
         for ss in range(n_scales):
@@ -39,11 +39,11 @@ class TVNet(nn.Module):
     def get_gaussian_conv(self):
         gaussian_conv = nn.Conv2d(1, 1, kernel_size=[5, 5], bias=False)
         gaussian_conv.weight.data = [[0.000874, 0.006976, 0.01386, 0.006976, 0.000874],
-                                        [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
-                                        [0.01386, 0.110656, 0.219833, 0.110656, 0.01386],
-                                        [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
-                                        [0.000874, 0.006976, 0.01386, 0.006976, 0.000874]]
-         return gaussian_conv
+                                     [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
+                                     [0.01386, 0.110656, 0.219833, 0.110656, 0.01386],
+                                     [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
+                                     [0.000874, 0.006976, 0.01386, 0.006976, 0.000874]]
+        return gaussian_conv
     
     def gray_scale_image(self, x):
         assert len(x.size()) == 4
@@ -127,25 +127,35 @@ class TVNet_Scale(nn.Module):
                  theta=0.3,  # weight parameter for (u - v)^2
                  zfactor=0.5,  # factor for building the image piramid
                 #  max_scales=5, # maximum number of scales for image piramid
-                 max_iterations=5  # maximum number of iterations for optimization
+                 n_iters=5  # maximum number of iterations for optimization
                 ):
 
         self.tau = tau
         self.lbda = lbda
         self.theta = theta
         self.zfactor = zfactor
+        self.n_iters = n_iters
         # self.max_scales = max_scales
 
-        self.gradient = []
-        self.divergence = []
+        self.gradient = nn.ModuleList()
+        self.divergence = nn.ModuleList()
 
-        for i in range()#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        self.divergence['div_p1'] = self.get_divergence_block()
-        self.divergence['div_p2'] = self.get_divergence_block()
+        for n_warp in range(warps):#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            gradient_warp = nn.ModuleList()
+            divergence_warp = nn.ModuleList()
+            for n_iter in range(self.n_iters):
+                gradient = nn.ModuleList()
+                gradient.append(self.get_gradient_block())
+                gradient.append(self.get_gradient_block())
+                gradient_warp.append(gradient)
 
-
-        self.gradient['u1'] = self.get_gradient_block()
-        self.gradient['u2'] = self.get_gradient_block()
+                divergence = nn.ModuleList()
+                divergence.append(self.get_divergence_block())
+                divergence.append(self.get_divergence_block())
+                divergence_warp.append(divergence)
+            
+            self.gradient.append(gradient_warp)
+            self.divergence.append(divergence_warp)
 
 
     def get_divergence_block(self):
@@ -190,7 +200,7 @@ class TVNet_Scale(nn.Module):
         # p11 = p12 = p21 = p22 = tf.zeros_like(x1) in original tensorflow code, 
         # it seems that each element of p11 to p22 shares a same memory address and I'm not sure if it would make some mistakes or not.
 
-        for warpings in range(warps):
+        for n_warp in range(warps):
             u1_flat = u1.reshape(x2.size(0), 1, x2.size(1)*x2.size(2))
             u2_flat = u2.reshape(x2.size(0), 1, x2.size(1)*x2.size(2))
 
@@ -210,7 +220,7 @@ class TVNet_Scale(nn.Module):
 
             rho_c = x2_warp - diff2_x_warp * u1 - diff2_y_warp * u2 - x1
 
-            for n_iter in range(max_iterations):
+            for n_iter in range(n_iters):
                 rho = rho_c + diff2_x_warp * u1 + diff2_y_warp * u2 + GRAD_IS_ZERO
 
                 masks1 = rho < -l_t * grad
@@ -228,11 +238,11 @@ class TVNet_Scale(nn.Module):
                 v1 = d1_1 + d1_2 + d1_3 + u1
                 v2 = d2_1 + d2_2 + d2_3 + u2
 
-                u1 = v1 + theta * self.forward_divergence(p11, p12, 'div_p1')
-                u2 = v2 + theta * self.forward_divergence(p21, p22, 'div_p2')
+                u1 = v1 + theta * self.forward_divergence(p11, p12, n_warp, n_iter, 0)
+                u2 = v2 + theta * self.forward_divergence(p21, p22, n_warp, n_iter, 1)
 
-                u1x, u1y = self.forward_gradient(u1, 'u1')
-                u2x, u2y = self.forward_gradient(u2, 'u2')
+                u1x, u1y = self.forward_gradient(u1, n_warp, n_iter, 0)
+                u2x, u2y = self.forward_gradient(u2, n_warp, n_iter, 1)
 
                 p11 = (p11 + taut * u1x) / (
                     1.0 + taut * torch.sqrt(torch.square(u1x) + torch.square(u1y) + GRAD_IS_ZERO))
@@ -259,7 +269,7 @@ class TVNet_Scale(nn.Module):
 
         return target_img
     
-    def forward_divergence(self, x, y, name):
+    def forward_divergence(self, x, y, n_warp, n_iter, n_block):
         assert len(x.size()) == 4 #[bs, c, h, w]
         assert len(x.size(1)) == 1 # grey scale image
 
@@ -271,19 +281,19 @@ class TVNet_Scale(nn.Module):
         first_row = torch.zeros(y.size(0), y.size(1), 1, y.size(3))
         y_pad = torch.cat((first_row, y_valid), dim=2)
 
-        diff_x = self.divergence[name][0](x_pad)
-        diff_y = self.divergence[name][1](y_pad)
+        diff_x = self.divergence[n_warp][n_iter][n_block][0](x_pad)
+        diff_y = self.divergence[n_warp][n_iter][n_block][1](y_pad)
 
         div = diff_x + diff_y
 
         return div
     
-    def forward_gradient(self, x, name):
+    def forward_gradient(self, x, n_warp, n_iter, n_block):
         assert len(x.size()) == 4
         assert len(x.size(1)) == 1 # grey scale image
 
-        diff_x = self.gradient[name][0](x)
-        diff_y = self.gradient[name][1](x)
+        diff_x = self.gradient[n_warp][n_iter][n_block][0](x)
+        diff_y = self.gradient[n_warp][n_iter][n_block][1](x)
 
         diff_x_valid = diff_x[:, :, :, :-1]
         last_col = torch.zeros(*diff_x_valid.size()[:-1], 1)
