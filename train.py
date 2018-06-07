@@ -1,7 +1,8 @@
 import os
 import numpy as np
 from tvnet import TVNet
-from frame_dataset import frame_dataset
+# import data.frame_dataset as frame_dataset
+from data.frame_dataset import frame_dataset
 from train_options import arguments
 import torch.utils.data as data
 from tvnet import TVNet
@@ -9,9 +10,11 @@ import scipy.io as sio
 
 
 if __name__ == '__main__':
-    args = arguments.parse()
-    dataloader = data.Dataloader(frame_dataset(args))
-    model = TVNet()
+    args = arguments().parse()
+    dataset = frame_dataset(args)
+    img_size = dataset.img_size
+    dataloader = data.DataLoader(dataset)
+    model = TVNet(img_size)
 
     for i, data in enumerate(dataloader):
         u1, u2, rho = model(data[0], data[1])
