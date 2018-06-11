@@ -307,13 +307,15 @@ class TVNet_Scale(nn.Module):
         assert len(x.size()) == 4
         assert len(u.size()) == 3
         assert len(v.size()) == 3
-        assert False
         
         u = u / x.size(3) * 2
         v = v / x.size(2) * 2
-        delta = torch.cat((u, v), dim=1)
+        theta = torch.cat((u, v), dim=1)
+
+        print(theta.size())
+        assert False
         
-        grid = F.affine_grid(delta, x.size())
+        grid = F.affine_grid(theta, x.size())
         target_img = F.grid_sample(x, grid)
 
         return target_img
