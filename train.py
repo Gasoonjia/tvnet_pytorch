@@ -14,10 +14,10 @@ if __name__ == '__main__':
     dataset = frame_dataset(args)
     img_size = dataset.img_size
     dataloader = data.DataLoader(dataset)
-    model = TVNet(img_size)
+    model = TVNet(img_size).cuda()
 
     for i, data in enumerate(dataloader):
-        u1, u2, rho = model(data[0], data[1])
+        u1, u2, rho = model(data[0].cuda(), data[1].cuda())
         u1_np = np.squeeze(u1.to_numpy())
         u2_np = np.squeeze(u2.to_numpy())
         u1_np = np.squeeze(u1_np)

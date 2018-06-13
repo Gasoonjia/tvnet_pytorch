@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-class transformer(nn.Module):
+class spatial_transformer(nn.Module):
     """Spatial Transformer Layer
 
     Implements a spatial transformer layer as described in [1]_.
@@ -55,6 +55,7 @@ class transformer(nn.Module):
     """
 
     def __init__(self, name='SpatialTransformer'):
+        super(spatial_transformer, self).__init__()
         self.name = name
 
     
@@ -76,9 +77,14 @@ class transformer(nn.Module):
         grid = grid[None, ...] # why do this since reshape to just one dimention below immediately
         grid = grid.view(-1)
         grid = grid.repeat([num_batch])
-        grid = grid.reshape(num_batch, 2, -1)
+        grid = grid.reshape(num_batch, 2, -1).double() #TODO: CHECK SHAPE
 
-        T_g = theta + grid
+        try:
+            T_g = theta + grid
+        except:
+            print(input_dim.size())
+            exit()
+            
         x_s = T_g[:, 0: 1, :]
         y_s = T_g[:, 1: 2, :]
         x_s_flat = x_s.reshape(-1)
@@ -93,18 +99,16 @@ class transformer(nn.Module):
     def _meshgrid(self, height, width):
 
         x_t = torch.matmul(torch.ones(height, 1), 
-                           torch.transpose(torch.linspace(-1.0, 1.0, width)[:, None, :, :], [1, 0]))
-        y_t = torch.matmul(torch.linspace(-1.0, 1.0, height)[:, 1, :, :], torch.ones(1, width))
+                           torch.transpose(torch.linspace(-1.0, 1.0, width)[:, None], 1, 0))
+        y_t = torch.matmul(torch.linspace(-1.0, 1.0, height)[:, None], torch.ones(1, width))
 
         x_t_flat = x_t.reshape(1, -1)
         y_t_flat = y_t.reshape(1, -1)
 
-        grid = torch.cat([x_t_flat, y_t_flat], dim=0)
+        grid = torch.cat([x_t_flat, y_t_flat], dim=0).cuda()
         return grid
     
-    def _interpolate(x, im, x, y, out_size):
-        assert type(x) == type(y) == int
-
+    def _interpolate(self, im, x, y, out_size):
         num_batch = im.size(0)
         channels = im.size(1)
         height = im.size(2)
@@ -124,43 +128,45 @@ class transformer(nn.Module):
         x = (x + 1) * (width_f - 1) / 2
         y = (y + 1) * (height_f - 1) / 2
 
-        x1 = int(np.ceil(x0))
-        y1 = int(np.ceil(y0))
+        x0 = x.floor().int()
+        y0 = y.floor().int()
+        x1 = x.ceil().int()
+        y1 = y.ceil().int()
 
-        x0 = np.clip(x0, zero, max_x - 1)
-        x1 = np.clip(x1, 0, max_x)
-        y0 = np.clip(y0, zero, max_y - 1)
-        y1 = np.clip(y1, zero, max_y)
+        x0 = x0.clamp(zero, max_x - 1)
+        x1 = x1.clamp(zero, max_x)
+        y0 = y0.clamp(zero, max_y - 1)
+        y1 = y1.clamp(zero, max_y)
         dim2 = width
         dim1 = width * height
 
-        base = self._repeat(torch.range(num_batch) * dim1, out_height * out_width)
+        base = self._repeat(torch.arange(0, num_batch).int() * dim1, out_height * out_width)
         base_y0 = base + y0 * dim2
-        base_y1 = base + y1 * dim1
+        base_y1 = base + y1 * dim2
         idx_a = base_y0 + x0
         idx_b = base_y1 + x0
         idx_c = base_y0 + x1
         idx_d = base_y1 + x1
 
         im_flat = im.reshape(-1, channels).double()
-        Ia = torch.index_select(im_flat, dim=0, index=idx_a)
-        Ib = torch.index_select(im_flat, dim=0, index=idx_b)
-        Ic = torch.index_select(im_flat, dim=0, index=idx_c)
-        Id = torch.index_select(im_flat, dim=0, index=idx_d)
+        Ia = torch.index_select(im_flat, dim=0, index=idx_a.long())
+        Ib = torch.index_select(im_flat, dim=0, index=idx_b.long())
+        Ic = torch.index_select(im_flat, dim=0, index=idx_c.long())
+        Id = torch.index_select(im_flat, dim=0, index=idx_d.long())
 
-        x0_f = float(x0)
-        x1_f = float(x1)
-        y0_f = float(y0)
-        y1_f = float(y1)
-        wa = (x1_f - x) * (y1_f - y)
-        wb = (x1_f - x) * (y - y0_f)
-        wc = (x - x0_f) * (y1_f - y)
-        wd = (x - x0_f) * (y - y0_f)
+        x0_f = x0.double()
+        x1_f = x1.double()
+        y0_f = y0.double()
+        y1_f = y1.double()
+        wa = ((x1_f - x) * (y1_f - y))[:, None]
+        wb = ((x1_f - x) * (y - y0_f))[:, None]
+        wc = ((x - x0_f) * (y1_f - y))[:, None]
+        wd = ((x - x0_f) * (y - y0_f))[:, None]
         
         output = wa * Ia + wb * Ib + wc * Ic + wd * Id
         return output
     
     def _repeat(self, x, n_repeats):
         rep = torch.ones([1, n_repeats], dtype=torch.int32) # why so complicate in original tensorflow verison?
-        x = torch.matmul(x.view(-1, 1), rep)
+        x = torch.matmul(x.view(-1, 1), rep).cuda()
         return x.view(-1)
