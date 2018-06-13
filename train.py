@@ -17,9 +17,10 @@ if __name__ == '__main__':
     model = TVNet(img_size).cuda()
 
     for i, data in enumerate(dataloader):
+        _, c, h, w = data[0].size()
         u1, u2, rho = model(data[0].cuda(), data[1].cuda())
-        u1_np = np.squeeze(u1.to_numpy())
-        u2_np = np.squeeze(u2.to_numpy())
+        u1_np = np.squeeze(u1.detach().cpu().numpy())
+        u2_np = np.squeeze(u2.detach().cpu().numpy())
         u1_np = np.squeeze(u1_np)
         u2_np = np.squeeze(u2_np)
         flow_mat = np.zeros([h, w, 2])

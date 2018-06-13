@@ -46,12 +46,12 @@ class TVNet(nn.Module):
         smooth_x2 = self.gaussian_smooth(norm_imgs[1], 1)
 
         for ss in range(self.n_scales-1, -1, -1):
-            down_sample_factor = self.zfactor * ss
+            down_sample_factor = self.zfactor ** ss
             down_height, down_width = self.zoom_size(self.height, self.width, down_sample_factor)
             
             if ss == self.n_scales - 1:
-                u1 = Variable(torch.zeros(smooth_x1.size(0), down_height, down_width, 1).double()).cuda()
-                u2 = Variable(torch.zeros(smooth_x2.size(0), down_height, down_width, 1).double()).cuda()
+                u1 = Variable(torch.zeros(smooth_x1.size(0), 1, down_height, down_width).double()).cuda()
+                u2 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).double()).cuda()
 
             down_x1 = self.zoom_image(smooth_x1, down_height, down_width, ss, 0)
             down_x2 = self.zoom_image(smooth_x2, down_height, down_width, ss, 1)
@@ -61,10 +61,10 @@ class TVNet(nn.Module):
             if ss == 0:
                 return u1, u2, rho
             
-            up_sample_factor = zfactor ** (ss - 1)
-            up_height, up_width = self.zoom_size(height, width, up_sample_factor)
-            u1 = self.zoom_image(u1, up_height, up_width, ss, 2) / zfactor
-            u2 = self.zoom_image(u2, up_height, up_width, ss, 3) / zfactor
+            up_sample_factor = self.zfactor ** (ss - 1)
+            up_height, up_width = self.zoom_size(self.height, self.width, up_sample_factor)
+            u1 = self.zoom_image(u1, up_height, up_width, ss, 2) / self.zfactor
+            u2 = self.zoom_image(u2, up_height, up_width, ss, 3) / self.zfactor
 
     
     def get_gray_conv(self):
@@ -223,6 +223,7 @@ class TVNet_Scale(nn.Module):
 
         return divergence_block
     
+
     def get_centered_gradient_block(self):
         centered_gradient_block = nn.ModuleList()
         input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
@@ -241,7 +242,7 @@ class TVNet_Scale(nn.Module):
         taut = self.tau / self.theta
 
         diff2_x, diff2_y = self.centered_gradient(x2)
-        print(diff2_x.size())
+        # print(diff2_x.size())
 
         p11 = torch.zeros_like(x1).cuda()
         p12 = torch.zeros_like(x1).cuda()
@@ -252,6 +253,8 @@ class TVNet_Scale(nn.Module):
         # it seems that each element of p11 to p22 shares a same memory address and I'm not sure if it would make some mistakes or not.
 
         for n_warp in range(self.n_warps):
+            # print(x2.size())
+            # print(u1.size())
             u1_flat = u1.view(x2.size(0), 1, x2.size(2)*x2.size(3))
             u2_flat = u2.view(x2.size(0), 1, x2.size(2)*x2.size(3))
 
@@ -265,7 +268,7 @@ class TVNet_Scale(nn.Module):
 
             diff2_x_warp = self.warp_image(diff2_x, u1_flat, u2_flat, n_warp, 1)
             diff2_x_warp = diff2_x_warp.view(diff2_x.size())
-            print(diff2_x_warp.size())
+            # print(diff2_x_warp.size())
 
             diff2_y_warp = self.warp_image(diff2_y, u1_flat, u2_flat, n_warp, 2)
             diff2_y_warp = diff2_y_warp.view(diff2_y.size())
@@ -276,20 +279,26 @@ class TVNet_Scale(nn.Module):
             grad = diff2_x_sq + diff2_y_sq + GRAD_IS_ZERO
 
             rho_c = x2_warp - diff2_x_warp * u1 - diff2_y_warp * u2 - x1
+            # print("x2_warp.size(): {}".format(x2_warp.size()))
+            # print("diff2_x_warp.size(): {}".format(diff2_x_warp.size()))
+            # print("u1.size(): {}".format(u1.size()))
+            # print("diff2_y_warp.size(): {}".format(diff2_y_warp.size()))
+            # print("u2.size(): {}".format(u2.size()))
+            # print("x1.size(): {}".format(x1.size()))
 
             for n_iter in range(self.n_iters):
                 rho = rho_c + diff2_x_warp * u1 + diff2_y_warp * u2 + GRAD_IS_ZERO
-                print("rho_c.size(): {}".format(rho_c.size()))
-                print("diff2_x_warp.size(): {}".format(diff2_x_warp.size()))
-                print("u1.size(): {}".format(u1.size()))
-                print("diff2_y_warp.size(): {}".format(diff2_y_warp.size()))
-                print("u2.size(): {}".format(u2.size()))
-                print("rho.size(): {}".format(rho.size()))
+                # print("rho_c.size(): {}".format(rho_c.size()))
+                # print("diff2_x_warp.size(): {}".format(diff2_x_warp.size()))
+                # print("u1.size(): {}".format(u1.size()))
+                # print("diff2_y_warp.size(): {}".format(diff2_y_warp.size()))
+                # print("u2.size(): {}".format(u2.size()))
+                # print("rho.size(): {}".format(rho.size()))
 
                 masks1 = rho < -l_t * grad
                 d1_1 = torch.where(masks1, l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
                 d2_1 = torch.where(masks1, l_t * diff2_y_warp, torch.zeros_like(diff2_y_warp))
-                print(d2_1.shape)
+                # print(d2_1.shape)
 
                 masks2 = rho > l_t * grad
                 d1_2 = torch.where(masks2, -l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
@@ -309,13 +318,13 @@ class TVNet_Scale(nn.Module):
                 u2x, u2y = self.forward_gradient(u2, n_warp, n_iter, 1)
 
                 p11 = (p11 + taut * u1x) / (
-                    1.0 + taut * torch.sqrt(torch.square(u1x) + torch.square(u1y) + GRAD_IS_ZERO))
+                    1.0 + taut * torch.sqrt(u1x ** 2 + u1y ** 2 + GRAD_IS_ZERO))
                 p12 = (p12 + taut * u1y) / (
-                    1.0 + taut * torch.sqrt(torch.square(u1x) + torch.square(u1y) + GRAD_IS_ZERO))
+                    1.0 + taut * torch.sqrt(u1x ** 2 + u1y ** 2 + GRAD_IS_ZERO))
                 p21 = (p21 + taut * u2x) / (
-                    1.0 + taut * torch.sqrt(torch.square(u2x) + torch.square(u2y) + GRAD_IS_ZERO))
+                    1.0 + taut * torch.sqrt(u2x ** 2 + u2y ** 2 + GRAD_IS_ZERO))
                 p22 = (p22 + taut * u2y) / (
-                    1.0 + taut * torch.sqrt(torch.square(u2x) + torch.square(u2y) + GRAD_IS_ZERO))
+                    1.0 + taut * torch.sqrt(u2x ** 2 + u2y ** 2 + GRAD_IS_ZERO))
 
         return u1, u2, rho
     
@@ -332,7 +341,7 @@ class TVNet_Scale(nn.Module):
 
         diff_x = torch.cat([first_col, diff_x_valid, last_col], dim=-1)
         
-        print(diff_x.size())
+        # print(diff_x.size())
         first_row = 0.5 * (x[:, :, 1: 2, :] - x[:, :, 0: 1, :])
         last_row = 0.5 * (x[:, :, -1:, :] - x[:, :, -2:-1, :])
         diff_y_valid = diff_y[:, :, 1:-1, :]
@@ -374,17 +383,17 @@ class TVNet_Scale(nn.Module):
     
     def forward_gradient(self, x, n_warp, n_iter, n_kernel):
         assert len(x.size()) == 4
-        assert len(x.size(1)) == 1 # grey scale image
+        assert x.size(1) == 1 # grey scale image
 
         diff_x = self.gradients[n_warp][n_iter][n_kernel][0](x)
         diff_y = self.gradients[n_warp][n_iter][n_kernel][1](x)
 
         diff_x_valid = diff_x[:, :, :, :-1]
-        last_col = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).cuda()
+        last_col = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda()
         diff_x = torch.cat((diff_x_valid, last_col), dim=3)
 
         diff_y_valid = diff_y[:, :, :-1, :]
-        last_row = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).cuda()
+        last_row = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).double().cuda()
         diff_y = torch.cat((diff_y_valid, last_row), dim=2)
 
         return diff_x, diff_y
