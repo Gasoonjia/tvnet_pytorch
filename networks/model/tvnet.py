@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.autograd.variable as Variable
 import torch.nn.functional as F
-from spatial_transformer import spatial_transformer
+from networks.model.spatial_transformer import spatial_transformer
 from utils import *
 
 GRAD_IS_ZERO = 1e-12
@@ -141,6 +141,7 @@ class TVNet(nn.Module):
         theta = torch.zeros(x.size(0), 2, new_height * new_width).cuda()
         zoomed_x = self.zoom_kernels[n_scale][n_kernel](x, theta, (new_height, new_width))
         return zoomed_x.reshape(x.size(0), x.size(1), new_height, new_width)
+            
 
 
 class TVNet_Scale(nn.Module):
@@ -165,11 +166,11 @@ class TVNet_Scale(nn.Module):
         self.n_iters = n_iters
         # self.max_scales = max_scales
 
-        self.gradients = nn.ModuleList()
-        self.divergences = nn.ModuleList()
+        self.gradient_kernels = nn.ModuleList()
+        self.divergence_kernels = nn.ModuleList()
         self.warp_kernels = nn.ModuleList()
 
-        self.centered_gradient_kernels = self.get_centered_gradient_block().train(False)
+        self.centered_gradient_kernels = self.get_centered_gradient_kernel().train(False)
 
         for n_warp in range(self.n_warps): #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             self.warp_kernels.append(get_module_list(spatial_transformer, 3))
@@ -177,14 +178,14 @@ class TVNet_Scale(nn.Module):
             gradient_warp = nn.ModuleList()
             divergence_warp = nn.ModuleList()
             for n_iter in range(self.n_iters):
-                gradient_warp.append(get_module_list(self.get_gradient_block, 2))
-                divergence_warp.append(get_module_list(self.get_divergence_block, 2))
+                gradient_warp.append(get_module_list(self.get_gradient_kernel, 2))
+                divergence_warp.append(get_module_list(self.get_divergence_kernel, 2))
             
-            self.gradients.append(gradient_warp)
-            self.divergences.append(divergence_warp)
+            self.gradient_kernels.append(gradient_warp)
+            self.divergence_kernels.append(divergence_warp)
     
 
-    def get_gradient_block(self):
+    def get_gradient_kernel(self):
         gradient_block = nn.ModuleList()
         input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
 
@@ -197,7 +198,7 @@ class TVNet_Scale(nn.Module):
         return gradient_block
 
 
-    def get_divergence_block(self):
+    def get_divergence_kernel(self):
         divergence_block = nn.ModuleList() #[conv_x, conv_y]
         input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
         
@@ -210,7 +211,7 @@ class TVNet_Scale(nn.Module):
         return divergence_block
     
 
-    def get_centered_gradient_block(self):
+    def get_centered_gradient_kernel(self):
         centered_gradient_block = nn.ModuleList()
         input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
 
@@ -338,8 +339,8 @@ class TVNet_Scale(nn.Module):
         first_row = torch.zeros(y.size(0), y.size(1), 1, y.size(3)).double().cuda()
         y_pad = torch.cat((first_row, y_valid), dim=2)
 
-        diff_x = self.divergences[n_warp][n_iter][n_kernel][0](x_pad)
-        diff_y = self.divergences[n_warp][n_iter][n_kernel][1](y_pad)
+        diff_x = self.divergence_kernels[n_warp][n_iter][n_kernel][0](x_pad)
+        diff_y = self.divergence_kernels[n_warp][n_iter][n_kernel][1](y_pad)
 
         div = diff_x + diff_y
 
@@ -349,8 +350,8 @@ class TVNet_Scale(nn.Module):
         assert len(x.size()) == 4
         assert x.size(1) == 1 # grey scale image
 
-        diff_x = self.gradients[n_warp][n_iter][n_kernel][0](x)
-        diff_y = self.gradients[n_warp][n_iter][n_kernel][1](x)
+        diff_x = self.gradient_kernels[n_warp][n_iter][n_kernel][0](x)
+        diff_y = self.gradient_kernels[n_warp][n_iter][n_kernel][1](x)
 
         diff_x_valid = diff_x[:, :, :, :-1]
         last_col = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda()
