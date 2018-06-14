@@ -24,12 +24,12 @@ class TVNet(nn.Module):
         n_scales = 1 + np.log(np.sqrt(self.height ** 2 + self.width ** 2) / 4.0) / np.log(1 / self.zfactor)
         self.n_scales = min(n_scales, self.max_scales)
 
-        self.tvnet = nn.ModuleList()
+        self.tvnet_kernels = nn.ModuleList()
         self.zoom_kernels = nn.ModuleList()
 
         for ss in range(self.n_scales):
             self.zoom_kernels.append(get_module_list(spatial_transformer, 4))
-            self.tvnet.append(TVNet_Scale())
+            self.tvnet_kernels.append(TVNet_Scale())
 
         self.gray_kernels = get_module_list(self.get_gray_conv, 2).train(False)
         self.gaussian_kernels = get_module_list(self.get_gaussian_conv, 2).train(False)
@@ -39,6 +39,8 @@ class TVNet(nn.Module):
         if x1.size(1) == 3:
             x1 = self.gray_scale_image(x1, 0)
             x2 = self.gray_scale_image(x2, 1)
+
+        # return x1, x2
 
         norm_imgs = self.normalize_images(x1, x2)
 
@@ -56,7 +58,7 @@ class TVNet(nn.Module):
             down_x1 = self.zoom_image(smooth_x1, down_height, down_width, ss, 0)
             down_x2 = self.zoom_image(smooth_x2, down_height, down_width, ss, 1)
 
-            u1, u2, rho = self.tvnet[ss](down_x1, down_x2, u1, u2)
+            u1, u2, rho = self.tvnet_kernels[ss](down_x1, down_x2, u1, u2)
 
             if ss == 0:
                 return u1, u2, rho
@@ -70,9 +72,6 @@ class TVNet(nn.Module):
     def get_gray_conv(self):
         input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
 
-        # gray_conv = nn.Conv2d(3, 1, kernel_size=[1, 1], bias=False, padding=[0, 0])
-        # gray_conv.weight.data = torch.tensor([[[[0.114]], [[0.587]], [[0.299]]]])
-
         gray_conv = conv2d_padding_same(input_size, 3, 1, [1, 1], bias=False, 
                                         weight=[[[[0.114]], [[0.587]], [[0.299]]]])
 
@@ -82,12 +81,6 @@ class TVNet(nn.Module):
     def get_gaussian_conv(self):
         input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
 
-        # gaussian_conv = nn.Conv2d(1, 1, kernel_size=[5, 5], bias=False)
-        # gaussian_conv.weight.data = torch.tensor([[[[0.000874, 0.006976, 0.01386, 0.006976, 0.000874],
-        #                                             [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
-        #                                             [0.01386, 0.110656, 0.219833, 0.110656, 0.01386],
-        #                                             [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
-        #                                             [0.000874, 0.006976, 0.01386, 0.006976, 0.000874]]]])
         gaussian_conv = conv2d_padding_same(input_size, 1, 1, [5, 5], bias=False, 
                                             weight=[[[[0.000874, 0.006976, 0.01386, 0.006976, 0.000874],
                                                     [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
@@ -102,7 +95,6 @@ class TVNet(nn.Module):
         assert x.size(1) == 3, 'number of channels must be 3 (i.e. RGB)'
 
         gray_x = self.gray_kernels[n_kernel](x)
-        gray_x = torch.floor(gray_x)
 
         return gray_x
 
@@ -199,8 +191,6 @@ class TVNet_Scale(nn.Module):
         conv_x = conv2d_padding_same(input_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
         gradient_block.append(conv_x)
 
-        # conv_y = nn.Conv2d(1, 1, kernel_size=[2, 1], bias=False, padding=[1, 0]) #padding = same
-        # conv_y.weight.data = torch.tensor([[[[-1], [1]]]])
         conv_y = conv2d_padding_same(input_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
         gradient_block.append(conv_y)
 
@@ -211,13 +201,9 @@ class TVNet_Scale(nn.Module):
         divergence_block = nn.ModuleList() #[conv_x, conv_y]
         input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
         
-        # conv_x = nn.Conv2d(1, 1, kernel_size=[1, 2], bias=False, padding=[0, 1])
-        # conv_x.weight.data = torch.tensor([[[[-1, 1]]]])
         conv_x = conv2d_padding_same(input_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
         divergence_block.append(conv_x)
 
-        # conv_y = nn.Conv2d(1, 1, kernel_size=[2, 1], bias=False, padding=[1, 0]) #padding = same
-        # conv_y.weight.data = torch.tensor([[[[-1], [1]]]])
         conv_y = conv2d_padding_same(input_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
         divergence_block.append(conv_y)
 
@@ -242,7 +228,6 @@ class TVNet_Scale(nn.Module):
         taut = self.tau / self.theta
 
         diff2_x, diff2_y = self.centered_gradient(x2)
-        # print(diff2_x.size())
 
         p11 = torch.zeros_like(x1).cuda()
         p12 = torch.zeros_like(x1).cuda()
@@ -253,18 +238,11 @@ class TVNet_Scale(nn.Module):
         # it seems that each element of p11 to p22 shares a same memory address and I'm not sure if it would make some mistakes or not.
 
         for n_warp in range(self.n_warps):
-            # print(x2.size())
-            # print(u1.size())
             u1_flat = u1.view(x2.size(0), 1, x2.size(2)*x2.size(3))
             u2_flat = u2.view(x2.size(0), 1, x2.size(2)*x2.size(3))
 
             x2_warp = self.warp_image(x2, u1_flat, u2_flat, n_warp, 0)
             x2_warp = x2_warp.view(x2.size())
-            # print("/////////////")
-            # print(x1.size())
-            # print(x2.size())
-            # print(diff2_x.size())
-            # print("/////////////")
 
             diff2_x_warp = self.warp_image(diff2_x, u1_flat, u2_flat, n_warp, 1)
             diff2_x_warp = diff2_x_warp.view(diff2_x.size())
@@ -279,26 +257,13 @@ class TVNet_Scale(nn.Module):
             grad = diff2_x_sq + diff2_y_sq + GRAD_IS_ZERO
 
             rho_c = x2_warp - diff2_x_warp * u1 - diff2_y_warp * u2 - x1
-            # print("x2_warp.size(): {}".format(x2_warp.size()))
-            # print("diff2_x_warp.size(): {}".format(diff2_x_warp.size()))
-            # print("u1.size(): {}".format(u1.size()))
-            # print("diff2_y_warp.size(): {}".format(diff2_y_warp.size()))
-            # print("u2.size(): {}".format(u2.size()))
-            # print("x1.size(): {}".format(x1.size()))
 
             for n_iter in range(self.n_iters):
                 rho = rho_c + diff2_x_warp * u1 + diff2_y_warp * u2 + GRAD_IS_ZERO
-                # print("rho_c.size(): {}".format(rho_c.size()))
-                # print("diff2_x_warp.size(): {}".format(diff2_x_warp.size()))
-                # print("u1.size(): {}".format(u1.size()))
-                # print("diff2_y_warp.size(): {}".format(diff2_y_warp.size()))
-                # print("u2.size(): {}".format(u2.size()))
-                # print("rho.size(): {}".format(rho.size()))
 
                 masks1 = rho < -l_t * grad
                 d1_1 = torch.where(masks1, l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
                 d2_1 = torch.where(masks1, l_t * diff2_y_warp, torch.zeros_like(diff2_y_warp))
-                # print(d2_1.shape)
 
                 masks2 = rho > l_t * grad
                 d1_2 = torch.where(masks2, -l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
@@ -341,7 +306,6 @@ class TVNet_Scale(nn.Module):
 
         diff_x = torch.cat([first_col, diff_x_valid, last_col], dim=-1)
         
-        # print(diff_x.size())
         first_row = 0.5 * (x[:, :, 1: 2, :] - x[:, :, 0: 1, :])
         last_row = 0.5 * (x[:, :, -1:, :] - x[:, :, -2:-1, :])
         diff_y_valid = diff_y[:, :, 1:-1, :]

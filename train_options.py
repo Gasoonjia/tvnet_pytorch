@@ -12,6 +12,7 @@ class arguments():
         self.argparser.add_argument('--n_threads', type=int, default=1, help='number of threads for dataloader')
         self.argparser.add_argument('--batch_size', type=int, default=1, help='just batch size')
         self.argparser.add_argument('--is_shuffle', type=bool, default=False, help='Do shuffle during loading data or not')
+        self.argparser.add_argument('--visualize', type=bool, default=True, help='storage the flow in image type')        
 
     def parse(self):
         self.args = self.argparser.parse_args()

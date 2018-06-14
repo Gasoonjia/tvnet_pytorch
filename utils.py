@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
+import torchvision.transforms as transforms
 import numpy as np
+import cv2
+import os
 
 def get_module_list(module, n_modules):
     ml = nn.ModuleList()
@@ -40,3 +43,29 @@ def conv2d_padding_same(input_size, input_channels, output_channels, kernel_size
         conv_layer.weight.data = torch.DoubleTensor(weight)
     
     return nn.Sequential(padding_layer, conv_layer)
+
+
+def im_tensor_to_numpy(x):
+    transpose = transforms.ToPILImage()
+    x = np.asarray(transpose(x))
+    return x
+
+
+def save_im_tensor(x, addr):
+    x = x.detach().cpu().float()
+    transpose = transforms.ToPILImage()
+    x = transpose(x[0])
+    x.save(addr)
+
+
+def save_flow_to_img(flow, h, w, c, name='result.png'):
+    hsv = np.zeros((h, w, c), dtype=np.uint8)
+    hsv[:, :, 0] = 255
+    hsv[:, :, 2] = 255
+    mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+    hsv[..., 0] = ang * 180 / np.pi / 2
+    hsv[..., 1] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+
+    rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    res_img_path = os.path.join('result', name)
+    cv2.imwrite(res_img_path, rgb)
