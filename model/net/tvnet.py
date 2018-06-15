@@ -1,26 +1,24 @@
 import numpy as np
 import torch 
 import torch.nn as nn
-import torch.autograd.variable as Variable
+from torch.autograd import Variable
 import torch.nn.functional as F
-from networks.model.spatial_transformer import spatial_transformer
+from model.net.spatial_transformer import spatial_transformer
 from utils import *
 
 GRAD_IS_ZERO = 1e-12
 
 class TVNet(nn.Module):
 
-    def __init__(self, 
-                 img_size,   # size for images being input
-                 zfactor=0.5,  # factor for building the image piramid
-                 max_scales=5, # maximum number of scales for image piramid
-                 ):
+    def __init__(self, args):
 
         super(TVNet, self).__init__()
-        self.zfactor = zfactor
-        self.max_scales = max_scales
+        self.zfactor = args.zfactor
+        self.max_scales = args.max_scales
+        self.data_size = args.data_size
+        self.args = args
 
-        self.height, self.width = img_size
+        _, _, self.height, self.width = self.data_size
         n_scales = 1 + np.log(np.sqrt(self.height ** 2 + self.width ** 2) / 4.0) / np.log(1 / self.zfactor)
         self.n_scales = min(n_scales, self.max_scales)
 
@@ -29,7 +27,7 @@ class TVNet(nn.Module):
 
         for ss in range(self.n_scales):
             self.zoom_kernels.append(get_module_list(spatial_transformer, 4))
-            self.tvnet_kernels.append(TVNet_Scale())
+            self.tvnet_kernels.append(TVNet_Scale(args))
 
         self.gray_kernels = get_module_list(self.get_gray_conv, 2).train(False)
         self.gaussian_kernels = get_module_list(self.get_gaussian_conv, 2).train(False)
@@ -52,8 +50,8 @@ class TVNet(nn.Module):
             down_height, down_width = self.zoom_size(self.height, self.width, down_sample_factor)
             
             if ss == self.n_scales - 1:
-                u1 = Variable(torch.zeros(smooth_x1.size(0), 1, down_height, down_width).double()).cuda()
-                u2 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).double()).cuda()
+                u1 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).double().cuda())
+                u2 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).double().cuda())
 
             down_x1 = self.zoom_image(smooth_x1, down_height, down_width, ss, 0)
             down_x2 = self.zoom_image(smooth_x2, down_height, down_width, ss, 1)
@@ -122,8 +120,8 @@ class TVNet(nn.Module):
         min_val_ex = min_val.view(*expand_dims)
         den_ex = den.view(*expand_dims)
 
-        x1_norm = torch.where(den > 0, 255. * (x1 - min_val_ex) / den_ex, x1)
-        x2_norm = torch.where(den > 0, 255. * (x2 - min_val_ex) / den_ex, x2)
+        x1_norm = torch_where(den > 0, 255. * (x1 - min_val_ex) / den_ex, x1)
+        x2_norm = torch_where(den > 0, 255. * (x2 - min_val_ex) / den_ex, x2)
 
         return x1_norm, x2_norm
 
@@ -138,32 +136,24 @@ class TVNet(nn.Module):
     def zoom_image(self, x, new_height, new_width, n_scale, n_kernel):
         assert len(x.shape) == 4
 
-        theta = torch.zeros(x.size(0), 2, new_height * new_width).cuda()
+        theta = Variable(torch.zeros(x.size(0), 2, new_height * new_width).cuda())
         zoomed_x = self.zoom_kernels[n_scale][n_kernel](x, theta, (new_height, new_width))
-        return zoomed_x.reshape(x.size(0), x.size(1), new_height, new_width)
+        return zoomed_x.view(x.size(0), x.size(1), new_height, new_width)
             
 
 
 class TVNet_Scale(nn.Module):
 
-    def __init__(self,
-                 tau=0.25,   # time step
-                 lbda=0.15,  # weight parameter for the data term
-                 theta=0.3,  # weight parameter for (u - v)^2
-                 zfactor=0.5,  # factor for building the image piramid
-                 warps=5,  # number of warpings per scale
-                #  max_scales=5, # maximum number of scales for image piramid
-                 n_iters=5  # maximum number of iterations for optimization
-                ):
+    def __init__(self, args):
 
         super(TVNet_Scale, self).__init__()
 
-        self.tau = tau
-        self.lbda = lbda
-        self.theta = theta
-        self.n_warps = warps
-        self.zfactor = zfactor
-        self.n_iters = n_iters
+        self.tau = args.tau
+        self.lbda = args.lbda
+        self.theta = args.theta
+        self.n_warps = args.warps
+        self.zfactor = args.zfactor
+        self.n_iters = args.n_iters
         # self.max_scales = max_scales
 
         self.gradient_kernels = nn.ModuleList()
@@ -263,16 +253,16 @@ class TVNet_Scale(nn.Module):
                 rho = rho_c + diff2_x_warp * u1 + diff2_y_warp * u2 + GRAD_IS_ZERO
 
                 masks1 = rho < -l_t * grad
-                d1_1 = torch.where(masks1, l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
-                d2_1 = torch.where(masks1, l_t * diff2_y_warp, torch.zeros_like(diff2_y_warp))
+                d1_1 = torch_where(masks1, l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
+                d2_1 = torch_where(masks1, l_t * diff2_y_warp, torch.zeros_like(diff2_y_warp))
 
                 masks2 = rho > l_t * grad
-                d1_2 = torch.where(masks2, -l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
-                d2_2 = torch.where(masks2, -l_t * diff2_y_warp, torch.zeros_like(diff2_y_warp))
+                d1_2 = torch_where(masks2, -l_t * diff2_x_warp, torch.zeros_like(diff2_x_warp))
+                d2_2 = torch_where(masks2, -l_t * diff2_y_warp, torch.zeros_like(diff2_y_warp))
 
-                masks3 = (~masks1) & (~masks2) & (grad > GRAD_IS_ZERO)
-                d1_3 = torch.where(masks3, -rho / grad * diff2_x_warp, torch.zeros_like(diff2_x_warp))
-                d2_3 = torch.where(masks3, -rho / grad * diff2_y_warp, torch.zeros_like(diff2_y_warp))
+                masks3 = (rho >= -l_t * grad) & (rho <= l_t * grad) & (grad > GRAD_IS_ZERO)
+                d1_3 = torch_where(masks3, -rho / grad * diff2_x_warp, torch.zeros_like(diff2_x_warp))
+                d2_3 = torch_where(masks3, -rho / grad * diff2_y_warp, torch.zeros_like(diff2_y_warp))
 
                 v1 = d1_1 + d1_2 + d1_3 + u1
                 v2 = d2_1 + d2_2 + d2_3 + u2
@@ -332,11 +322,11 @@ class TVNet_Scale(nn.Module):
         assert x.size(1) == 1 # grey scale image
 
         x_valid = x[:, :, :, :-1]
-        first_col = torch.zeros(x.size(0), x.size(1), x.size(2), 1).double().cuda()
+        first_col = Variable(torch.zeros(x.size(0), x.size(1), x.size(2), 1).double().cuda())
         x_pad = torch.cat((first_col, x_valid), dim=3)
 
         y_valid = y[:, :, :-1, :]
-        first_row = torch.zeros(y.size(0), y.size(1), 1, y.size(3)).double().cuda()
+        first_row = Variable(torch.zeros(y.size(0), y.size(1), 1, y.size(3)).double().cuda())
         y_pad = torch.cat((first_row, y_valid), dim=2)
 
         diff_x = self.divergence_kernels[n_warp][n_iter][n_kernel][0](x_pad)
@@ -354,11 +344,11 @@ class TVNet_Scale(nn.Module):
         diff_y = self.gradient_kernels[n_warp][n_iter][n_kernel][1](x)
 
         diff_x_valid = diff_x[:, :, :, :-1]
-        last_col = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda()
+        last_col = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda())
         diff_x = torch.cat((diff_x_valid, last_col), dim=3)
 
         diff_y_valid = diff_y[:, :, :-1, :]
-        last_row = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).double().cuda()
+        last_row = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).double().cuda())
         diff_y = torch.cat((diff_y_valid, last_row), dim=2)
 
         return diff_x, diff_y

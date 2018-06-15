@@ -15,6 +15,7 @@
 
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 import numpy as np
 
 class spatial_transformer(nn.Module):
@@ -74,25 +75,22 @@ class spatial_transformer(nn.Module):
         out_height = out_size[0]
         out_width = out_size[1]
         grid = self._meshgrid(out_height, out_width)
-        grid = grid[None, ...] # why do this since reshape to just one dimention below immediately
+        grid = grid[None, ...] # why do this since view to just one dimention below immediately
         grid = grid.view(-1)
-        grid = grid.repeat([num_batch])
-        grid = grid.reshape(num_batch, 2, -1).double() #TODO: CHECK SHAPE
+        grid = grid.repeat(num_batch)
+        grid = grid.view(num_batch, 2, -1).double() #TODO: CHECK SHAPE
+        # print(theta.size())
+        # print(grid.size())
+        T_g = theta + Variable(grid)
 
-        try:
-            T_g = theta + grid
-        except:
-            print(input_dim.size())
-            exit()
-            
-        x_s = T_g[:, 0: 1, :]
-        y_s = T_g[:, 1: 2, :]
-        x_s_flat = x_s.reshape(-1)
-        y_s_flat = y_s.reshape(-1)
+        x_s = T_g.data[:, 0: 1, :]
+        y_s = T_g.data[:, 1: 2, :]
+        x_s_flat = x_s.view(-1)
+        y_s_flat = y_s.view(-1)
 
         input_transformed = self._interpolate(input_dim, x_s_flat, y_s_flat, out_size)
 
-        output = input_transformed.reshape(num_batch, num_channels, out_height, out_width)
+        output = Variable(input_transformed.view(num_batch, num_channels, out_height, out_width))
 
         return output
     
@@ -102,8 +100,8 @@ class spatial_transformer(nn.Module):
                            torch.transpose(torch.linspace(-1.0, 1.0, width)[:, None], 1, 0))
         y_t = torch.matmul(torch.linspace(-1.0, 1.0, height)[:, None], torch.ones(1, width))
 
-        x_t_flat = x_t.reshape(1, -1)
-        y_t_flat = y_t.reshape(1, -1)
+        x_t_flat = x_t.view(1, -1)
+        y_t_flat = y_t.view(1, -1)
 
         grid = torch.cat([x_t_flat, y_t_flat], dim=0).cuda()
         return grid
@@ -148,11 +146,11 @@ class spatial_transformer(nn.Module):
         idx_c = base_y0 + x1
         idx_d = base_y1 + x1
 
-        im_flat = im.reshape(-1, channels).double()
-        Ia = torch.index_select(im_flat, dim=0, index=idx_a.long())
-        Ib = torch.index_select(im_flat, dim=0, index=idx_b.long())
-        Ic = torch.index_select(im_flat, dim=0, index=idx_c.long())
-        Id = torch.index_select(im_flat, dim=0, index=idx_d.long())
+        im_flat = im.view(-1, channels).double()
+        Ia = torch.index_select(im_flat, dim=0, index=Variable(idx_a.long()))
+        Ib = torch.index_select(im_flat, dim=0, index=Variable(idx_b.long()))
+        Ic = torch.index_select(im_flat, dim=0, index=Variable(idx_c.long()))
+        Id = torch.index_select(im_flat, dim=0, index=Variable(idx_d.long()))
 
         x0_f = x0.double()
         x1_f = x1.double()
@@ -163,10 +161,12 @@ class spatial_transformer(nn.Module):
         wc = ((x - x0_f) * (y1_f - y))[:, None]
         wd = ((x - x0_f) * (y - y0_f))[:, None]
         
-        output = wa * Ia + wb * Ib + wc * Ic + wd * Id
+        output = wa * Ia.data + wb * Ib.data + wc * Ic.data + wd * Id.data
         return output
     
     def _repeat(self, x, n_repeats):
-        rep = torch.ones([1, n_repeats], dtype=torch.int32) # why so complicate in original tensorflow verison?
+        rep = torch.ones([1, n_repeats]).int()
+        # There's some differnent between my implementation and original's
+        # If something wrong, should change it back to original complex type
         x = torch.matmul(x.view(-1, 1), rep).cuda()
         return x.view(-1)

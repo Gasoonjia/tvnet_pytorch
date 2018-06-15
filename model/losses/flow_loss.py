@@ -1,17 +1,17 @@
 import torch 
 import torch.nn as nn
+from torch.autograd import Variable
 import numpy as np
-from networks.model.spatial_transformer import spatial_transformer
+from model.net.spatial_transformer import spatial_transformer
 
 from utils import *
 
 class flow_loss(nn.Module):
-    def __init__(self,
-                 image_size, # input image size 
-                 lbda=0.15  # weight parameter for the data term
-                ):
-        self.lbda = lbda
-        self.image_size = image_size
+    def __init__(self, args):
+        super(flow_loss, self).__init__()
+
+        self.lbda = args.lbda
+        self.data_size = args.data_size
         self.warp_kernels = spatial_transformer()
         self.gradient_kernels = get_module_list(self.get_gradient_kernel, 2)
 
@@ -41,16 +41,16 @@ class flow_loss(nn.Module):
 
         return trans_image
     
-    def forward(self, u1, u2):
+    def forward(self, u1, u2, x1, x2):
         u1x, u1y = self.forward_gradient(u1, 0)
         u2x, u2y = self.forward_gradient(u2, 1)
 
-        u1_flat = u1.reshape(self.image_size[0], 1, self.image_size[2] * self.image_size[3])
-        u2_flat = u2.reshape(self.image_size[0], 1, self.image_size[2] * self.image_size[3])
+        u1_flat = u1.view(self.data_size[0], 1, self.data_size[2] * self.data_size[3])
+        u2_flat = u2.view(self.data_size[0], 1, self.data_size[2] * self.data_size[3])
 
         x2_warp = self.warp_image(x2, u1_flat, u2_flat)
-        x2_warp = x2_warp.reshape(self.image_size)
-        loss = lbda * torch.mean(torch.abs(x2_warp - x1)) + torch.mean(
+        x2_warp = x2_warp.view(self.data_size)
+        loss = self.lbda * torch.mean(torch.abs(x2_warp - x1)) + torch.mean(
             torch.abs(u1x) + torch.abs(u1y) + torch.abs(u2x) + torch.abs(u2y))
         return loss
     
@@ -62,11 +62,11 @@ class flow_loss(nn.Module):
         diff_y = self.gradient_kernels[n_kernel][1](x)
 
         diff_x_valid = diff_x[:, :, :, :-1]
-        last_col = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda()
+        last_col = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda())
         diff_x = torch.cat((diff_x_valid, last_col), dim=3)
 
         diff_y_valid = diff_y[:, :, :-1, :]
-        last_row = torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).double().cuda()
+        last_row = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).double().cuda())
         diff_y = torch.cat((diff_y_valid, last_row), dim=2)
 
         return diff_x, diff_y

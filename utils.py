@@ -38,7 +38,7 @@ def conv2d_padding_same(input_size, input_channels, output_channels, kernel_size
     assert padding_left + padding_right == padding_horizontal, "{}, {}, {}".format(padding_left, padding_right, padding_horizontal)
     
     padding_layer = nn.ConstantPad2d((padding_left, padding_right, padding_top, padding_bottom), padding_value)
-    conv_layer = nn.Conv2d(input_channels, output_channels, kernel_size, stride=stride, bias=bias)
+    conv_layer = nn.Conv2d(input_channels, output_channels, kernel_size, stride=tuple(stride), bias=bias)
     if weight is not None:
         conv_layer.weight.data = torch.DoubleTensor(weight)
     
@@ -69,3 +69,7 @@ def save_flow_to_img(flow, h, w, c, name='result.png'):
     rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     res_img_path = os.path.join('result', name)
     cv2.imwrite(res_img_path, rgb)
+
+def torch_where(cond, x_1, x_2):
+    cond = cond.double()    
+    return (cond * x_1) + ((1-cond) * x_2)
