@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     for n_epoch in range(args.n_epoch):
         for i, data in enumerate(dataloader):
-            model.forward(data[0], data[1])
+            u1, u2 = model.forward(data[0], data[1], need_result=True)
             model.optimize()
         if n_epoch % 100 == 99:
             print(n_epoch + 1)
@@ -28,10 +28,9 @@ if __name__ == '__main__':
         elif n_epoch < 10:
             print(n_epoch + 1)
 
-    _, c, h, w = data[0].size()
-    u1, u2, rho = model(data[0].cuda(), data[1].cuda())
-    u1_np = np.squeeze(u1.detach().cpu().numpy())
-    u2_np = np.squeeze(u2.detach().cpu().numpy())
+    _, c, h, w = args.data_size
+    u1_np = np.squeeze(u1.detach().cpu().data.numpy())
+    u2_np = np.squeeze(u2.detach().cpu().data.numpy())
     flow_mat = np.zeros([h, w, 2])
     flow_mat[:, :, 0] = u1_np
     flow_mat[:, :, 1] = u2_np
