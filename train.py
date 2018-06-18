@@ -17,16 +17,20 @@ if __name__ == '__main__':
     dataloader = data.DataLoader(dataset)
     model = model(args)
 
-    for n_epoch in range(args.n_epoch):
-        for i, data in enumerate(dataloader):
-            u1, u2 = model.forward(data[0], data[1], need_result=True)
-            model.optimize()
-        if n_epoch % 100 == 99:
-            print(n_epoch + 1)
-        elif n_epoch < 100 and (n_epoch + 1) % 10 == 0:
-            print(n_epoch + 1)
-        elif n_epoch < 10:
-            print(n_epoch + 1)
+    if not args.demo:
+        for n_epoch in range(args.n_epoch):
+            for i, data in enumerate(dataloader):
+                model.forward(data[0], data[1])
+                model.optimize()
+            if n_epoch % 100 == 99:
+                print(n_epoch + 1)
+            elif n_epoch < 100 and (n_epoch + 1) % 10 == 0:
+                print(n_epoch + 1)
+            elif n_epoch < 10:
+                print(n_epoch + 1)
+    
+    for data in dataloader:
+        u1, u2 = model.forward(data[0], data[1], need_result=True)
 
     _, c, h, w = args.data_size
     u1_np = np.squeeze(u1.detach().cpu().data.numpy())

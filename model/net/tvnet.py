@@ -14,13 +14,13 @@ class TVNet(nn.Module):
 
         super(TVNet, self).__init__()
         self.zfactor = args.zfactor
-        self.max_scales = args.max_scales
+        self.n_m_scales = args.n_m_scales
         self.data_size = args.data_size
         self.args = args
 
         _, _, self.height, self.width = self.data_size
         n_scales = 1 + np.log(np.sqrt(self.height ** 2 + self.width ** 2) / 4.0) / np.log(1 / self.zfactor)
-        self.n_scales = min(n_scales, self.max_scales)
+        self.n_scales = min(n_scales, self.n_m_scales)
 
         self.tvnet_kernels = nn.ModuleList()
         self.zoom_kernels = nn.ModuleList()
@@ -68,18 +68,14 @@ class TVNet(nn.Module):
 
     
     def get_gray_conv(self):
-        input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
-
-        gray_conv = conv2d_padding_same(input_size, 3, 1, [1, 1], bias=False, 
+        gray_conv = conv2d_padding_same(self.data_size, 3, 1, [1, 1], bias=False, 
                                         weight=[[[[0.114]], [[0.587]], [[0.299]]]])
 
         return gray_conv
 
 
     def get_gaussian_conv(self):
-        input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
-
-        gaussian_conv = conv2d_padding_same(input_size, 1, 1, [5, 5], bias=False, 
+        gaussian_conv = conv2d_padding_same(self.data_size, 1, 1, [5, 5], bias=False, 
                                             weight=[[[[0.000874, 0.006976, 0.01386, 0.006976, 0.000874],
                                                     [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
                                                     [0.01386, 0.110656, 0.219833, 0.110656, 0.01386],
@@ -151,10 +147,10 @@ class TVNet_Scale(nn.Module):
         self.tau = args.tau
         self.lbda = args.lbda
         self.theta = args.theta
-        self.n_warps = args.warps
+        self.n_warps = args.n_warps
         self.zfactor = args.zfactor
         self.n_iters = args.n_iters
-        # self.max_scales = max_scales
+        self.data_size = args.data_size
 
         self.gradient_kernels = nn.ModuleList()
         self.divergence_kernels = nn.ModuleList()
@@ -177,12 +173,11 @@ class TVNet_Scale(nn.Module):
 
     def get_gradient_kernel(self):
         gradient_block = nn.ModuleList()
-        input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
 
-        conv_x = conv2d_padding_same(input_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
+        conv_x = conv2d_padding_same(self.data_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
         gradient_block.append(conv_x)
 
-        conv_y = conv2d_padding_same(input_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
+        conv_y = conv2d_padding_same(self.data_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
         gradient_block.append(conv_y)
 
         return gradient_block
@@ -190,12 +185,11 @@ class TVNet_Scale(nn.Module):
 
     def get_divergence_kernel(self):
         divergence_block = nn.ModuleList() #[conv_x, conv_y]
-        input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
         
-        conv_x = conv2d_padding_same(input_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
+        conv_x = conv2d_padding_same(self.data_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
         divergence_block.append(conv_x)
 
-        conv_y = conv2d_padding_same(input_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
+        conv_y = conv2d_padding_same(self.data_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
         divergence_block.append(conv_y)
 
         return divergence_block
@@ -203,12 +197,11 @@ class TVNet_Scale(nn.Module):
 
     def get_centered_gradient_kernel(self):
         centered_gradient_block = nn.ModuleList()
-        input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
 
-        conv_x = conv2d_padding_same(input_size, 1, 1, [1, 3], bias=False, weight=[[[[-0.5, 0, 0.5]]]])
+        conv_x = conv2d_padding_same(self.data_size, 1, 1, [1, 3], bias=False, weight=[[[[-0.5, 0, 0.5]]]])
         centered_gradient_block.append(conv_x)
 
-        conv_y = conv2d_padding_same(input_size, 1, 1, [3, 1], bias=False, weight=[[[[-0.5], [0], [0.5]]]])
+        conv_y = conv2d_padding_same(self.data_size, 1, 1, [3, 1], bias=False, weight=[[[[-0.5], [0], [0.5]]]])
         centered_gradient_block.append(conv_y)
 
         return centered_gradient_block

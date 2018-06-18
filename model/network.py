@@ -13,7 +13,6 @@ class model():
         ## Define neural networks...
         self.flow_net = TVNet(args).cuda()
         
-
         ## ...with their losses...
         self.flow_loss = flow_loss(args).cuda()
 
