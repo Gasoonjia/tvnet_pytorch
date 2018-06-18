@@ -1,6 +1,7 @@
 # tvnet_pytorch
 This repository contains pytorch version implementation code for the project 'End-to-End Learning of Motion Representation for Video Understanding' (CVPR 2018) based on the original tensorflow implementation (http://lijiefan.me/project_webpage/TVNet_cvpr/index.html).  
-I also replace the original matlib code with pure python code for visualization.
+
+And we also replaced the original matlib code with pure python code for visualization.
 
 ## Prerequisites
 #### Pytorch
@@ -21,11 +22,11 @@ https://github.com/Gasoonjia/tvnet_pytorch
 #### II) Use TVNet to generate motion representation 
 
 The file (`train_options.py`) has the following options:
-- `--n_m_scales`: Max number of scales in TVNet (default: 1)
-- `--n_warps`: Number of warppings in TVNet (default: 1)
-- `--n_iters`: Number of iterations in TVNet (default: 50)
-- `--visualize`: Whether save the result into image file (default: True)
-- `--demo`: Just using original weights for demo if mark it.
+-  `--n_m_scales`: Max number of scales in TVNet (default: 1)
+-  `--n_warps`: Number of warppings in TVNet (default: 1)
+-  `--n_iters`: Number of iterations in TVNet (default: 50)
+-  `--visualize`: Whether save the result into image file (default: True)
+-  `--demo`: Just using original weights for demo if mark it.
 
 Sample usages include
 - Generate motion representation for frames in `frame/img1.png` and `frame/img2.png`.
