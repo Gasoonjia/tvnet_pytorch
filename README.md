@@ -1,5 +1,5 @@
 # tvnet_pytorch
-This repository contains pytorch version implementation code for the project 'End-to-End Learning of Motion Representation for Video Understanding' (CVPR 2018) based on the original tensorflow implementation (http://lijiefan.me/project_webpage/TVNet_cvpr/index.html).  
+This repository contains pytorch version implementation code for the project 'End-to-End Learning of Motion Representation for Video Understanding' (CVPR 2018) based on the original tensorflow implementation (https://github.com/LijieFan/tvnet/).  
 
 And we also replaced the original matlib code with pure python code for visualization.
 
