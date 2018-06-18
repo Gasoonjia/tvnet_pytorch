@@ -71,5 +71,18 @@ def save_flow_to_img(flow, h, w, c, name='result.png'):
     cv2.imwrite(res_img_path, rgb)
 
 def torch_where(cond, x_1, x_2):
-    cond = cond.double()    
+    cond = cond.double()
     return (cond * x_1) + ((1-cond) * x_2)
+
+def meshgrid(height, width, n_repeat):
+    x_t = torch.matmul(torch.ones(height, 1), 
+                        torch.transpose(torch.linspace(-1.0, 1.0, width)[:, None], 1, 0))
+    y_t = torch.matmul(torch.linspace(-1.0, 1.0, height)[:, None], torch.ones(1, width))
+
+    x_t_flat = x_t.view(-1, 1)
+    y_t_flat = y_t.view(-1, 1)
+
+    grid = torch.cat([x_t_flat, y_t_flat], dim=1).cuda().view(-1)
+    grid = grid.repeat(n_repeat).view(n_repeat, height, width, 2)
+
+    return grid

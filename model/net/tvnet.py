@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
-from model.net.spatial_transformer import spatial_transformer
+
 from utils import *
 
 GRAD_IS_ZERO = 1e-12
@@ -23,10 +23,8 @@ class TVNet(nn.Module):
         self.n_scales = min(n_scales, self.n_m_scales)
 
         self.tvnet_kernels = nn.ModuleList()
-        self.zoom_kernels = nn.ModuleList()
 
         for ss in range(self.n_scales):
-            self.zoom_kernels.append(get_module_list(spatial_transformer, 4))
             self.tvnet_kernels.append(TVNet_Scale(args))
 
         self.gray_kernels = get_module_list(self.get_gray_conv, 2).train(False)
@@ -132,8 +130,9 @@ class TVNet(nn.Module):
     def zoom_image(self, x, new_height, new_width, n_scale, n_kernel):
         assert len(x.shape) == 4
 
-        theta = Variable(torch.zeros(x.size(0), 2, new_height * new_width).cuda())
-        zoomed_x = self.zoom_kernels[n_scale][n_kernel](x, theta, (new_height, new_width))
+        theta = Variable(torch.zeros(x.size(0), new_height, new_width, 2).cuda().double())
+        theta += Variable(meshgrid(new_height, new_width, x.size(0)).cuda().double())
+        zoomed_x = F.grid_sample(x, theta, (new_height, new_width))
         return zoomed_x.view(x.size(0), x.size(1), new_height, new_width)
             
 
@@ -154,13 +153,10 @@ class TVNet_Scale(nn.Module):
 
         self.gradient_kernels = nn.ModuleList()
         self.divergence_kernels = nn.ModuleList()
-        self.warp_kernels = nn.ModuleList()
 
         self.centered_gradient_kernels = self.get_centered_gradient_kernel().train(False)
 
         for n_warp in range(self.n_warps): #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            self.warp_kernels.append(get_module_list(spatial_transformer, 3))
-
             gradient_warp = nn.ModuleList()
             divergence_warp = nn.ModuleList()
             for n_iter in range(self.n_iters):
@@ -304,9 +300,12 @@ class TVNet_Scale(nn.Module):
         
         u = u / x.size(3) * 2
         v = v / x.size(2) * 2
-        theta = torch.cat((u, v), dim=1)
+        theta = torch.cat((u, v), dim=1).cuda().double()
 
-        trans_image = self.warp_kernels[n_warp][n_kernel](x, theta, (x.size(2), x.size(3)))
+        theta = theta.transpose(1, 2).contiguous().view(x.size(0), x.size(2), x.size(3), 2)
+        theta += Variable(meshgrid(x.size(2), x.size(3), x.size(0))).cuda().double()
+
+        trans_image = F.grid_sample(x, theta, (x.size(2), x.size(3)))
 
         return trans_image
     
