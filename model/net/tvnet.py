@@ -48,11 +48,11 @@ class TVNet(nn.Module):
             down_height, down_width = self.zoom_size(self.height, self.width, down_sample_factor)
             
             if ss == self.n_scales - 1:
-                u1 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).double().cuda())
-                u2 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).double().cuda())
+                u1 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).float().cuda())
+                u2 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).float().cuda())
 
-            down_x1 = self.zoom_image(smooth_x1, down_height, down_width, ss, 0)
-            down_x2 = self.zoom_image(smooth_x2, down_height, down_width, ss, 1)
+            down_x1 = self.zoom_image(smooth_x1, down_height, down_width)
+            down_x2 = self.zoom_image(smooth_x2, down_height, down_width)
 
             u1, u2, rho = self.tvnet_kernels[ss](down_x1, down_x2, u1, u2)
 
@@ -61,8 +61,8 @@ class TVNet(nn.Module):
             
             up_sample_factor = self.zfactor ** (ss - 1)
             up_height, up_width = self.zoom_size(self.height, self.width, up_sample_factor)
-            u1 = self.zoom_image(u1, up_height, up_width, ss, 2) / self.zfactor
-            u2 = self.zoom_image(u2, up_height, up_width, ss, 3) / self.zfactor
+            u1 = self.zoom_image(u1, up_height, up_width) / self.zfactor
+            u2 = self.zoom_image(u2, up_height, up_width) / self.zfactor
 
     
     def get_gray_conv(self):
@@ -127,11 +127,11 @@ class TVNet(nn.Module):
         return new_height, new_width
 
     
-    def zoom_image(self, x, new_height, new_width, n_scale, n_kernel):
+    def zoom_image(self, x, new_height, new_width):
         assert len(x.shape) == 4
 
-        theta = Variable(torch.zeros(x.size(0), new_height, new_width, 2).cuda().double())
-        theta += Variable(meshgrid(new_height, new_width, x.size(0)).cuda().double())
+        theta = Variable(torch.zeros(x.size(0), new_height, new_width, 2).cuda().float())
+        theta += Variable(meshgrid(new_height, new_width, x.size(0)).cuda().float())
         zoomed_x = F.grid_sample(x, theta, (new_height, new_width))
         return zoomed_x.view(x.size(0), x.size(1), new_height, new_width)
             
@@ -221,14 +221,14 @@ class TVNet_Scale(nn.Module):
             u1_flat = u1.view(x2.size(0), 1, x2.size(2)*x2.size(3))
             u2_flat = u2.view(x2.size(0), 1, x2.size(2)*x2.size(3))
 
-            x2_warp = self.warp_image(x2, u1_flat, u2_flat, n_warp, 0)
+            x2_warp = self.warp_image(x2, u1_flat, u2_flat)
             x2_warp = x2_warp.view(x2.size())
 
-            diff2_x_warp = self.warp_image(diff2_x, u1_flat, u2_flat, n_warp, 1)
+            diff2_x_warp = self.warp_image(diff2_x, u1_flat, u2_flat)
             diff2_x_warp = diff2_x_warp.view(diff2_x.size())
             # print(diff2_x_warp.size())
 
-            diff2_y_warp = self.warp_image(diff2_y, u1_flat, u2_flat, n_warp, 2)
+            diff2_y_warp = self.warp_image(diff2_y, u1_flat, u2_flat)
             diff2_y_warp = diff2_y_warp.view(diff2_y.size())
 
             diff2_x_sq = diff2_x_warp ** 2
@@ -293,17 +293,17 @@ class TVNet_Scale(nn.Module):
 
         return diff_x, diff_y 
 
-    def warp_image(self, x, u, v, n_warp, n_kernel):
+    def warp_image(self, x, u, v):
         assert len(x.size()) == 4
         assert len(u.size()) == 3
         assert len(v.size()) == 3
         
         u = u / x.size(3) * 2
         v = v / x.size(2) * 2
-        theta = torch.cat((u, v), dim=1).cuda().double()
+        theta = torch.cat((u, v), dim=1).cuda().float()
 
         theta = theta.transpose(1, 2).contiguous().view(x.size(0), x.size(2), x.size(3), 2)
-        theta += Variable(meshgrid(x.size(2), x.size(3), x.size(0))).cuda().double()
+        theta += Variable(meshgrid(x.size(2), x.size(3), x.size(0))).cuda().float()
 
         trans_image = F.grid_sample(x, theta, (x.size(2), x.size(3)))
 
@@ -314,11 +314,11 @@ class TVNet_Scale(nn.Module):
         assert x.size(1) == 1 # grey scale image
 
         x_valid = x[:, :, :, :-1]
-        first_col = Variable(torch.zeros(x.size(0), x.size(1), x.size(2), 1).double().cuda())
+        first_col = Variable(torch.zeros(x.size(0), x.size(1), x.size(2), 1).float().cuda())
         x_pad = torch.cat((first_col, x_valid), dim=3)
 
         y_valid = y[:, :, :-1, :]
-        first_row = Variable(torch.zeros(y.size(0), y.size(1), 1, y.size(3)).double().cuda())
+        first_row = Variable(torch.zeros(y.size(0), y.size(1), 1, y.size(3)).float().cuda())
         y_pad = torch.cat((first_row, y_valid), dim=2)
 
         diff_x = self.divergence_kernels[n_warp][n_iter][n_kernel][0](x_pad)
@@ -336,11 +336,11 @@ class TVNet_Scale(nn.Module):
         diff_y = self.gradient_kernels[n_warp][n_iter][n_kernel][1](x)
 
         diff_x_valid = diff_x[:, :, :, :-1]
-        last_col = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda())
+        last_col = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).float().cuda())
         diff_x = torch.cat((diff_x_valid, last_col), dim=3)
 
         diff_y_valid = diff_y[:, :, :-1, :]
-        last_row = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).double().cuda())
+        last_row = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).float().cuda())
         diff_y = torch.cat((diff_y_valid, last_row), dim=2)
 
         return diff_x, diff_y

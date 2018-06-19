@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
-from model.net.spatial_transformer import spatial_transformer
+import torch.nn.functional as F
 
 from utils import *
 
@@ -12,7 +12,6 @@ class flow_loss(nn.Module):
 
         self.lbda = args.lbda
         self.data_size = args.data_size
-        self.warp_kernels = spatial_transformer()
         self.gradient_kernels = get_module_list(self.get_gradient_kernel, 2)
 
     
@@ -35,9 +34,12 @@ class flow_loss(nn.Module):
         
         u = u / x.size(3) * 2
         v = v / x.size(2) * 2
-        theta = torch.cat((u, v), dim=1)
+        theta = torch.cat((u, v), dim=1).cuda().float()
 
-        trans_image = self.warp_kernels(x, theta, (x.size(2), x.size(3)))
+        theta = theta.transpose(1, 2).contiguous().view(x.size(0), x.size(2), x.size(3), 2)
+        theta += Variable(meshgrid(x.size(2), x.size(3), x.size(0))).cuda().float()
+
+        trans_image = F.grid_sample(x, theta, (x.size(2), x.size(3)))
 
         return trans_image
     
@@ -62,11 +64,11 @@ class flow_loss(nn.Module):
         diff_y = self.gradient_kernels[n_kernel][1](x)
 
         diff_x_valid = diff_x[:, :, :, :-1]
-        last_col = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).double().cuda())
+        last_col = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), diff_x_valid.size(2), 1).float().cuda())
         diff_x = torch.cat((diff_x_valid, last_col), dim=3)
 
         diff_y_valid = diff_y[:, :, :-1, :]
-        last_row = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).double().cuda())
+        last_row = Variable(torch.zeros(diff_x_valid.size(0), diff_x_valid.size(1), 1, diff_y_valid.size(3)).float().cuda())
         diff_y = torch.cat((diff_y_valid, last_row), dim=2)
 
         return diff_x, diff_y

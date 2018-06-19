@@ -40,7 +40,7 @@ def conv2d_padding_same(input_size, input_channels, output_channels, kernel_size
     padding_layer = nn.ConstantPad2d((padding_left, padding_right, padding_top, padding_bottom), padding_value)
     conv_layer = nn.Conv2d(input_channels, output_channels, kernel_size, stride=tuple(stride), bias=bias)
     if weight is not None:
-        conv_layer.weight.data = torch.DoubleTensor(weight)
+        conv_layer.weight.data = torch.FloatTensor(weight)
     
     return nn.Sequential(padding_layer, conv_layer)
 
@@ -71,7 +71,7 @@ def save_flow_to_img(flow, h, w, c, name='result.png'):
     cv2.imwrite(res_img_path, rgb)
 
 def torch_where(cond, x_1, x_2):
-    cond = cond.double()
+    cond = cond.float()
     return (cond * x_1) + ((1-cond) * x_2)
 
 def meshgrid(height, width, n_repeat):

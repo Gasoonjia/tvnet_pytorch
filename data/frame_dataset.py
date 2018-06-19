@@ -18,8 +18,8 @@ class frame_dataset(data.Dataset):
         return self.frame_addr.shape[0] - 1
 
     def __getitem__(self, index):
-        frame_1 = self.to_tensor(Image.open(self.frame_addr[index]).convert('RGB')).double()
-        frame_2 = self.to_tensor(Image.open(self.frame_addr[index+1]).convert('RGB')).double()
+        frame_1 = self.to_tensor(Image.open(self.frame_addr[index]).convert('RGB')).float()
+        frame_2 = self.to_tensor(Image.open(self.frame_addr[index+1]).convert('RGB')).float()
         return frame_1, frame_2
 
 def get_transfrom():
