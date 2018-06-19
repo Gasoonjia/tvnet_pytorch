@@ -10,6 +10,7 @@ from utils import *
 
 
 if __name__ == '__main__':
+    assert torch.cuda.is_available(), "Only support GPU"
     args = arguments().parse()
     dataset = frame_dataset(args)
     args.data_size = [args.batch_size, 3, *(dataset.img_size)]
