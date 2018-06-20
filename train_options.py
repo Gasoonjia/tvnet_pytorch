@@ -11,7 +11,7 @@ class arguments():
         self.argparser.add_argument('--n_epoch', type=int, default=1000, help='number of epochs')
         self.argparser.add_argument('--n_threads', type=int, default=1, help='number of threads for dataloader')
         self.argparser.add_argument('--batch_size', type=int, default=1, help='just batch size')
-        self.argparser.add_argument('--learning_rate', type=float, default=0.05, help='learning rate')
+        self.argparser.add_argument('--learning_rate', type=float, default=0.005, help='learning rate')
         self.argparser.add_argument('--is_shuffle', type=bool, default=False, help='Do shuffle during loading data or not')
         self.argparser.add_argument('--visualize', type=bool, default=True, help='storage the flow in image type')        
         self.argparser.add_argument('--data_size', help='input data size')

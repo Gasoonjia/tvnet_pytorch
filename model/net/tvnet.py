@@ -11,7 +11,6 @@ GRAD_IS_ZERO = 1e-12
 class TVNet(nn.Module):
 
     def __init__(self, args):
-
         super(TVNet, self).__init__()
         self.zfactor = args.zfactor
         self.n_m_scales = args.n_m_scales
@@ -29,9 +28,11 @@ class TVNet(nn.Module):
 
         self.gray_kernels = get_module_list(self.get_gray_conv, 2).train(False)
         self.gaussian_kernels = get_module_list(self.get_gaussian_conv, 2).train(False)
-    
+        self.u1_init = Variable(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float().cuda(), requires_grad=True)
+        self.u2_init = Variable(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float().cuda(), requires_grad=True)
 
     def forward(self, x1, x2):
+        u1, u2 = self.u1_init, self.u2_init
         if x1.size(1) == 3:
             x1 = self.gray_scale_image(x1, 0)
             x2 = self.gray_scale_image(x2, 1)
@@ -46,10 +47,6 @@ class TVNet(nn.Module):
         for ss in range(self.n_scales-1, -1, -1):
             down_sample_factor = self.zfactor ** ss
             down_height, down_width = self.zoom_size(self.height, self.width, down_sample_factor)
-            
-            if ss == self.n_scales - 1:
-                u1 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).float().cuda())
-                u2 = Variable(torch.zeros(smooth_x2.size(0), 1, down_height, down_width).float().cuda())
 
             down_x1 = self.zoom_image(smooth_x1, down_height, down_width)
             down_x2 = self.zoom_image(smooth_x2, down_height, down_width)

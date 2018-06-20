@@ -9,6 +9,7 @@ class model():
     def __init__(self, args):
 
         self.args = args
+        self.data_size = args.data_size
 
         ## Define neural networks...
         self.flow_net = TVNet(args).cuda()
@@ -18,6 +19,9 @@ class model():
 
         ## ... and optimizers
         self.flow_optmizer = torch.optim.SGD(self.flow_net.parameters(), 
+                                             lr=args.learning_rate,
+                                             momentum=0.5)
+        self.u_optimizer = torch.optim.SGD([self.flow_net.u1_init, self.flow_net.u2_init], 
                                              lr=args.learning_rate,
                                              momentum=0.5)
     
@@ -30,8 +34,10 @@ class model():
     
     def optimize(self):
         self.flow_optmizer.zero_grad()
+        self.u_optimizer.zero_grad()
         self.loss.backward()
         self.flow_optmizer.step()
+        self.u_optimizer.step()
 
     def update_optimizer(self):
         lrd = self.opt.lr / self.opt.niter_decay
