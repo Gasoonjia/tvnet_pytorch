@@ -28,8 +28,8 @@ class TVNet(nn.Module):
 
         self.gray_kernels = get_module_list(self.get_gray_conv, 2).train(False)
         self.gaussian_kernels = get_module_list(self.get_gaussian_conv, 2).train(False)
-        self.u1_init = Variable(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float().cuda(), requires_grad=True)
-        self.u2_init = Variable(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float().cuda(), requires_grad=True)
+        self.u1_init = nn.Parameter(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float())
+        self.u2_init = nn.Parameter(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float())
 
     def forward(self, x1, x2):
         u1, u2 = self.u1_init, self.u2_init
