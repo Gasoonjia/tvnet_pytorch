@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
+from model.net.Conv2d_tensorflow import Conv2d
 
 from utils import *
 
@@ -17,12 +18,13 @@ class flow_loss(nn.Module):
     
     def get_gradient_kernel(self):
         gradient_block = nn.ModuleList()
-        input_size = (1, 1, 480, 480) # NOTE：should change it afterwards. 
 
-        conv_x = conv2d_padding_same(input_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
+        conv_x = Conv2d(1, 1, [1, 2], padding='SAME',
+                        bias=False, weight=[[[[-1, 1]]]])
         gradient_block.append(conv_x)
 
-        conv_y = conv2d_padding_same(input_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
+        conv_y = Conv2d(1, 1, [2, 1], padding='SAME',
+                        bias=False, weight=[[[[-1], [1]]]])
         gradient_block.append(conv_y)
 
         return gradient_block

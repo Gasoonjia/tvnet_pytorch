@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 
+from model.net.Conv2d_tensorflow import Conv2d
 from utils import *
 
 GRAD_IS_ZERO = 1e-12
@@ -63,19 +64,19 @@ class TVNet(nn.Module):
 
     
     def get_gray_conv(self):
-        gray_conv = conv2d_padding_same(self.data_size, 3, 1, [1, 1], bias=False, 
-                                        weight=[[[[0.114]], [[0.587]], [[0.299]]]])
+        gray_conv = Conv2d(3, 1, [1, 1], bias=False, padding='SAME',
+                     weight=[[[[0.114]], [[0.587]], [[0.299]]]])
 
         return gray_conv
 
 
     def get_gaussian_conv(self):
-        gaussian_conv = conv2d_padding_same(self.data_size, 1, 1, [5, 5], bias=False, 
-                                            weight=[[[[0.000874, 0.006976, 0.01386, 0.006976, 0.000874],
-                                                    [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
-                                                    [0.01386, 0.110656, 0.219833, 0.110656, 0.01386],
-                                                    [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
-                                                    [0.000874, 0.006976, 0.01386, 0.006976, 0.000874]]]])
+        gaussian_conv = Conv2d(1, 1, [5, 5], bias=False, padding='SAME',
+                               weight=[[[[0.000874, 0.006976, 0.01386, 0.006976, 0.000874],
+                                    [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
+                                    [0.01386, 0.110656, 0.219833, 0.110656, 0.01386],
+                                    [0.006976, 0.0557, 0.110656, 0.0557, 0.006976],
+                                    [0.000874, 0.006976, 0.01386, 0.006976, 0.000874]]]])
         return gaussian_conv
 
     
@@ -167,10 +168,12 @@ class TVNet_Scale(nn.Module):
     def get_gradient_kernel(self):
         gradient_block = nn.ModuleList()
 
-        conv_x = conv2d_padding_same(self.data_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
+        conv_x = Conv2d(1, 1, [1, 2], padding='SAME', 
+                        bias=False, weight=[[[[-1, 1]]]])
         gradient_block.append(conv_x)
 
-        conv_y = conv2d_padding_same(self.data_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
+        conv_y = Conv2d(1, 1, [2, 1], padding='SAME', 
+                        bias=False, weight=[[[[-1], [1]]]])
         gradient_block.append(conv_y)
 
         return gradient_block
@@ -179,10 +182,12 @@ class TVNet_Scale(nn.Module):
     def get_divergence_kernel(self):
         divergence_block = nn.ModuleList() #[conv_x, conv_y]
         
-        conv_x = conv2d_padding_same(self.data_size, 1, 1, [1, 2], bias=False, weight=[[[[-1, 1]]]])
+        conv_x = Conv2d(1, 1, [1, 2], padding='SAME', 
+                        bias=False, weight=[[[[-1, 1]]]])
         divergence_block.append(conv_x)
 
-        conv_y = conv2d_padding_same(self.data_size, 1, 1, [2, 1], bias=False, weight=[[[[-1], [1]]]])
+        conv_y = Conv2d(1, 1, [2, 1], padding='SAME', 
+                        bias=False, weight=[[[[-1], [1]]]])
         divergence_block.append(conv_y)
 
         return divergence_block
@@ -191,10 +196,12 @@ class TVNet_Scale(nn.Module):
     def get_centered_gradient_kernel(self):
         centered_gradient_block = nn.ModuleList()
 
-        conv_x = conv2d_padding_same(self.data_size, 1, 1, [1, 3], bias=False, weight=[[[[-0.5, 0, 0.5]]]])
+        conv_x = Conv2d(1, 1, [1, 3], padding='SAME', 
+                        bias=False, weight=[[[[-0.5, 0, 0.5]]]])
         centered_gradient_block.append(conv_x)
 
-        conv_y = conv2d_padding_same(self.data_size, 1, 1, [3, 1], bias=False, weight=[[[[-0.5], [0], [0.5]]]])
+        conv_y = Conv2d(1, 1, [3, 1], padding='SAME',
+                        bias=False, weight=[[[[-0.5], [0], [0.5]]]])
         centered_gradient_block.append(conv_y)
 
         return centered_gradient_block
