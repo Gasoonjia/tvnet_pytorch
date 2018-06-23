@@ -108,6 +108,8 @@ def conv2d_same_padding(input, weight, bias=None, stride=1, padding='VALID', dil
     stride, dilation = check_format(stride, dilation)
 
     if padding == 'SAME':
+        padding = 0
+
         input_rows = input.size(2)
         filter_rows = weight.size(2)
         out_rows = (input_rows + stride[0] - 1) // stride[0]
@@ -122,19 +124,15 @@ def conv2d_same_padding(input, weight, bias=None, stride=1, padding='VALID', dil
                             (filter_cols - 1) * dilation[1] + 1 - input_cols)
         cols_odd = padding_cols % 2
 
-        input = pad(input, [0, int(cols_odd), 0, int(rows_odd)])
-
-        return F.conv2d(input, weight, bias, stride,
-                    padding=(padding_rows // 2, padding_cols // 2),
-                    dilation=dilation, groups=groups)
+        input = pad(input, [padding_cols // 2, padding_cols // 2 + int(cols_odd),
+                            padding_rows // 2, padding_rows // 2 + int(rows_odd)])
     
     elif padding == 'VALID':
-        return F.conv2d(input, weight, bias, stride, 
-                        dilation=dilation, groups=groups)
+        padding = 0
     
-    elif type(padding) == int:
-        return F.conv2d(input, weight, bias, stride, padding=padding
-                        dilation=dilation, groups=groups)
-    
-    else:
+    elif type(padding) != int:        
         raise ValueError('Padding should be SAME, VALID or specific integer, but not {}.'.format(padding))
+
+    return F.conv2d(input, weight, bias, stride, padding=padding,
+                    dilation=dilation, groups=groups)
+    
