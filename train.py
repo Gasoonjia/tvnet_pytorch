@@ -15,12 +15,12 @@ if __name__ == '__main__':
     dataset = frame_dataset(args)
     args.data_size = [args.batch_size, 3, *(dataset.img_size)]
     dataloader = data.DataLoader(dataset)
-    model = model(args)
+    model = model(args).cuda()
 
     if not args.demo:
         for n_epoch in range(args.n_epoch):
             for i, data in enumerate(dataloader):
-                model.forward(data[0], data[1])
+                model(data[0], data[1])
                 model.optimize()
             if n_epoch % 100 == 99:
                 print(n_epoch + 1)

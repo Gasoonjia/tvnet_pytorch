@@ -5,17 +5,18 @@ from .losses.flow_loss import flow_loss
 from .net.tvnet import TVNet
 from torch.autograd import Variable
 
-class model():
+class model(nn.Module):
     def __init__(self, args):
+        super(model, self).__init__()
 
         self.args = args
         self.data_size = args.data_size
 
         ## Define neural networks...
-        self.flow_net = TVNet(args).cuda()
+        self.flow_net = TVNet(args)
         
         ## ...with their losses...
-        self.flow_loss = flow_loss(args).cuda()
+        self.flow_loss = flow_loss(args)
 
         ## ... and optimizers
         self.flow_optmizer = torch.optim.SGD(self.flow_net.parameters(), 
