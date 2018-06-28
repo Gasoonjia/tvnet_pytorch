@@ -97,12 +97,11 @@ def conv2d_same_padding(input, weight, bias=None, stride=1, padding='VALID', dil
         for i in range(len(argv)):
             if type(argv[i]) is int:
                 argv_format.append((argv[i], argv[i]))
-            elif type(argv[i]) is list:
+            elif hasattr(argv[i], "__getitem__"):
                 argv_format.append(tuple(argv[i]))
-            elif type(argv[i]) is not tuple:
-                raise TypeError('stride and dilation should all be int, list or tuple')
             else:
-                argv_format.append(argv[i])
+                raise TypeError('all input should be int or list-type, now is {}'.format(argv[i]))
+
         return argv_format
     
     stride, dilation = check_format(stride, dilation)

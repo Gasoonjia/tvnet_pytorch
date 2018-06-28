@@ -27,23 +27,23 @@ class TVNet(nn.Module):
         for ss in range(self.n_scales):
             self.tvnet_kernels.append(TVNet_Scale(args))
 
-        self.gray_kernels = get_module_list(self.get_gray_conv, 2).train(False)
-        self.gaussian_kernels = get_module_list(self.get_gaussian_conv, 2).train(False)
-        self.u1_init = nn.Parameter(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float())
-        self.u2_init = nn.Parameter(torch.zeros(self.data_size[0], 1, self.data_size[2], self.data_size[3]).float())
+        self.gray_kernel = self.get_gray_conv().train(False)
+        self.gaussian_kernel = self.get_gaussian_conv().train(False)
+        self.u1_init = nn.Parameter(torch.zeros(1, 1, self.data_size[2], self.data_size[3]).float())
+        self.u2_init = nn.Parameter(torch.zeros(1, 1, self.data_size[2], self.data_size[3]).float())
 
     def forward(self, x1, x2):
-        u1, u2 = self.u1_init, self.u2_init
+        u1, u2 = self.u1_init.repeat(x1.size(0), 1, 1, 1), self.u2_init.repeat(x1.size(0), 1, 1, 1)
         if x1.size(1) == 3:
-            x1 = self.gray_scale_image(x1, 0)
-            x2 = self.gray_scale_image(x2, 1)
+            x1 = self.gray_scale_image(x1)
+            x2 = self.gray_scale_image(x2)
 
         # return x1, x2
 
         norm_imgs = self.normalize_images(x1, x2)
 
-        smooth_x1 = self.gaussian_smooth(norm_imgs[0], 0)
-        smooth_x2 = self.gaussian_smooth(norm_imgs[1], 1)
+        smooth_x1 = self.gaussian_smooth(norm_imgs[0])
+        smooth_x2 = self.gaussian_smooth(norm_imgs[1])
 
         for ss in range(self.n_scales-1, -1, -1):
             down_sample_factor = self.zfactor ** ss
@@ -80,18 +80,18 @@ class TVNet(nn.Module):
         return gaussian_conv
 
     
-    def gray_scale_image(self, x, n_kernel):
+    def gray_scale_image(self, x):
         assert len(x.size()) == 4
         assert x.size(1) == 3, 'number of channels must be 3 (i.e. RGB)'
 
-        gray_x = self.gray_kernels[n_kernel](x)
+        gray_x = self.gray_kernel(x)
 
         return gray_x
 
     
-    def gaussian_smooth(self, x, n_kernel):
+    def gaussian_smooth(self, x):
         assert len(x.size()) == 4
-        smooth_x = self.gaussian_kernels[n_kernel](x)
+        smooth_x = self.gaussian_kernel(x)
 
         return smooth_x
 

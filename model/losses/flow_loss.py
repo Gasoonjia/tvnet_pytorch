@@ -46,14 +46,15 @@ class flow_loss(nn.Module):
         return trans_image
     
     def forward(self, u1, u2, x1, x2):
+        self.data_size = x1.size()
         u1x, u1y = self.forward_gradient(u1, 0)
         u2x, u2y = self.forward_gradient(u2, 1)
 
-        u1_flat = u1.view(self.data_size[0], 1, self.data_size[2] * self.data_size[3])
-        u2_flat = u2.view(self.data_size[0], 1, self.data_size[2] * self.data_size[3])
+        u1_flat = u1.view(x1.size(0), 1, x1.size(2) * x1.size(3))
+        u2_flat = u2.view(x1.size(0), 1, x1.size(2) * x1.size(3))
 
         x2_warp = self.warp_image(x2, u1_flat, u2_flat)
-        x2_warp = x2_warp.view(self.data_size)
+        x2_warp = x2_warp.view(x1.size())
         loss = self.lbda * torch.mean(torch.abs(x2_warp - x1)) + torch.mean(
             torch.abs(u1x) + torch.abs(u1y) + torch.abs(u2x) + torch.abs(u2y))
         return loss

@@ -24,7 +24,7 @@ class model(nn.Module):
                                              momentum=0.5)
     
     def forward(self, x1, x2, need_result=False):
-        x1, x2 = Variable(x1.cuda()), Variable(x2.cuda())
+        x1, x2 = Variable(x1), Variable(x2)
         u1, u2, rho = self.flow_net(x1, x2)
         self.loss = self.flow_loss(u1, u2, x1, x2)
         if need_result:
