@@ -29,8 +29,10 @@ class TVNet(nn.Module):
 
         self.gray_kernel = self.get_gray_conv().train(False)
         self.gaussian_kernel = self.get_gaussian_conv().train(False)
-        self.u1_init = nn.Parameter(torch.zeros(1, 1, self.data_size[2], self.data_size[3]).float())
-        self.u2_init = nn.Parameter(torch.zeros(1, 1, self.data_size[2], self.data_size[3]).float())
+
+        u_size = self.zoom_size(self.data_size[2], self.data_size[3], self.zfactor ** (self.n_m_scales - 1))
+        self.u1_init = nn.Parameter(torch.zeros(1, 1, *u_size).float())
+        self.u2_init = nn.Parameter(torch.zeros(1, 1, *u_size).float())
 
     def forward(self, x1, x2):
         u1, u2 = self.u1_init.repeat(x1.size(0), 1, 1, 1), self.u2_init.repeat(x1.size(0), 1, 1, 1)
@@ -39,7 +41,6 @@ class TVNet(nn.Module):
             x2 = self.gray_scale_image(x2)
 
         # return x1, x2
-
         norm_imgs = self.normalize_images(x1, x2)
 
         smooth_x1 = self.gaussian_smooth(norm_imgs[0])
@@ -208,6 +209,8 @@ class TVNet_Scale(nn.Module):
 
 
     def forward(self, x1, x2, u1, u2):
+        assert x1.size() == u1.size(), "{} vs {}".format(x1.size(), u1.size())
+
         l_t = self.lbda * self.theta
         taut = self.tau / self.theta
 
