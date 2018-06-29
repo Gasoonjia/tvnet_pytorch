@@ -82,11 +82,13 @@ def meshgrid(height, width, n_repeat):
     y_t = torch.matmul(torch.linspace(-1.0, 1.0, height)[:, None], torch.ones(1, width))
     # print(y_t)
 
-    x_t_flat = x_t.view(-1, 1)
-    y_t_flat = y_t.view(-1, 1)
+    x_t_flat = x_t.view(1, -1)
+    y_t_flat = y_t.view(1, -1)
 
-    grid = torch.cat([x_t_flat, y_t_flat], dim=1).cuda().view(-1)
-    grid = grid.repeat(n_repeat).view(n_repeat, height, width, 2)
+    grid = torch.cat([x_t_flat, y_t_flat])[None, ...].cuda().view(-1)
+    grid = grid.repeat(n_repeat)
+    grid = grid.view(n_repeat, 2, -1)
+    grid = grid.permute(0, 2, 1).contiguous().view(n_repeat, height, width, 2)
 
     # print(grid[0, :, :, 0], x_t)
 
