@@ -22,7 +22,7 @@ https://github.com/Gasoonjia/tvnet_pytorch
 #### II) Use TVNet to generate motion representation 
 
 The file (`train_options.py`) has the following options:
--  `--n_m_scales`: Max number of scales in TVNet (default: 1)
+-  `--max_nscale`: Max number of scales in TVNet (default: 1)
 -  `--n_warps`: Number of warppings in TVNet (default: 1)
 -  `--n_iters`: Number of iterations in TVNet (default: 50)
 -  `--visualize`: Whether save the result into image file (default: True)
@@ -32,7 +32,7 @@ Sample usages include
 - Generate motion representation for frames in `frame/img1.png` and `frame/img2.png`.
 
 ```
-python train.py --n_m_scales 1 --n_warps 1 --n_iters 50 --demo
+python train.py --max_nscale 1 --n_warps 1 --n_iters 50 --demo
 ``` 
 
 #### III) Check results and visualization

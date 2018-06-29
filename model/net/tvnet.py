@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 
 from model.net.Conv2d_tensorflow import Conv2d
+from model.net.spatial_transformer import spatial_transformer as st
 from utils import *
 
 GRAD_IS_ZERO = 1e-12
@@ -14,13 +15,15 @@ class TVNet(nn.Module):
     def __init__(self, args):
         super(TVNet, self).__init__()
         self.zfactor = args.zfactor
-        self.n_m_scales = args.n_m_scales
+        self.max_nscale = args.max_nscale
         self.data_size = args.data_size
         self.args = args
 
         _, _, self.height, self.width = self.data_size
         n_scales = 1 + np.log(np.sqrt(self.height ** 2 + self.width ** 2) / 4.0) / np.log(1 / self.zfactor)
-        self.n_scales = min(n_scales, self.n_m_scales)
+        self.n_scales = min(n_scales, self.max_nscale)
+
+        self.st = st()
 
         self.tvnet_kernels = nn.ModuleList()
 
@@ -30,7 +33,7 @@ class TVNet(nn.Module):
         self.gray_kernel = self.get_gray_conv().train(False)
         self.gaussian_kernel = self.get_gaussian_conv().train(False)
 
-        u_size = self.zoom_size(self.data_size[2], self.data_size[3], self.zfactor ** (self.n_m_scales - 1))
+        u_size = self.zoom_size(self.data_size[2], self.data_size[3], self.zfactor ** (self.max_nscale - 1))
         self.u1_init = nn.Parameter(torch.zeros(1, 1, *u_size).float())
         self.u2_init = nn.Parameter(torch.zeros(1, 1, *u_size).float())
 
@@ -129,9 +132,8 @@ class TVNet(nn.Module):
     def zoom_image(self, x, new_height, new_width):
         assert len(x.shape) == 4
 
-        theta = Variable(torch.zeros(x.size(0), new_height, new_width, 2).cuda().float())
-        theta += Variable(meshgrid(new_height, new_width, x.size(0)).cuda().float())
-        zoomed_x = F.grid_sample(x, theta, (new_height, new_width))
+        theta = Variable(torch.zeros(x.size(0), 2, new_height * new_width).cuda().float())
+        zoomed_x = self.st(x, theta, (new_height, new_width))
         return zoomed_x.view(x.size(0), x.size(1), new_height, new_width)
             
 
@@ -149,6 +151,8 @@ class TVNet_Scale(nn.Module):
         self.zfactor = args.zfactor
         self.n_iters = args.n_iters
         self.data_size = args.data_size
+
+        self.st = st()
 
         self.gradient_kernels = nn.ModuleList()
         self.divergence_kernels = nn.ModuleList()
@@ -309,10 +313,7 @@ class TVNet_Scale(nn.Module):
         v = v / x.size(2) * 2
         theta = torch.cat((u, v), dim=1).cuda().float()
 
-        theta = theta.transpose(1, 2).contiguous().view(x.size(0), x.size(2), x.size(3), 2)
-        theta += Variable(meshgrid(x.size(2), x.size(3), x.size(0))).cuda().float()
-
-        trans_image = F.grid_sample(x, theta, (x.size(2), x.size(3)))
+        trans_image = self.st(x, theta, x.size()[2:])
 
         return trans_image
     

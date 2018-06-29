@@ -16,7 +16,7 @@ class arguments():
         self.argparser.add_argument('--visualize', type=bool, default=True, help='storage the flow in image type')        
         self.argparser.add_argument('--data_size', help='input data size')
         self.argparser.add_argument('--zfactor', type=float, default=0.5, help='factor for building the image piramid')    
-        self.argparser.add_argument('--n_m_scales', type=int, default=1, help='maximum number of scales for image piramid')    
+        self.argparser.add_argument('--max_nscale', type=int, default=1, help='maximum number of scales for image piramid')    
         self.argparser.add_argument('--tau', type=float, default=0.25, help='time step')    
         self.argparser.add_argument('--lbda', type=float, default=0.15, help='weight parameter for the data term')    
         self.argparser.add_argument('--theta', type=float, default=0.3, help='weight parameter for (u - v)^2')    
