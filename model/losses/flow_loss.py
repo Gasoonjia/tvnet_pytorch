@@ -14,7 +14,6 @@ class flow_loss(nn.Module):
         self.lbda = args.lbda
         self.data_size = args.data_size
         self.gradient_kernels = get_module_list(self.get_gradient_kernel, 2)
-
     
     def get_gradient_kernel(self):
         gradient_block = nn.ModuleList()
@@ -33,7 +32,7 @@ class flow_loss(nn.Module):
         assert len(x.size()) == 4
         assert len(u.size()) == 3
         assert len(v.size()) == 3
-        
+
         u = u / x.size(3) * 2
         v = v / x.size(2) * 2
         theta = torch.cat((u, v), dim=1).cuda().float()
@@ -57,7 +56,7 @@ class flow_loss(nn.Module):
         x2_warp = x2_warp.view(x1.size())
         loss = self.lbda * torch.mean(torch.abs(x2_warp - x1)) + torch.mean(
             torch.abs(u1x) + torch.abs(u1y) + torch.abs(u2x) + torch.abs(u2y))
-        return loss
+        return loss, x2_warp
     
     def forward_gradient(self, x, n_kernel):
         assert len(x.size()) == 4

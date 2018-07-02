@@ -52,13 +52,13 @@ def im_tensor_to_numpy(x):
 
 
 def save_im_tensor(x, addr):
-    x = x.detach().cpu().float()
+    x = x.cpu().float()
     transpose = transforms.ToPILImage()
     x = transpose(x[0])
     x.save(addr)
 
 
-def save_flow_to_img(flow, h, w, c, name='result.png'):
+def save_flow_to_img(flow, h, w, c, name='_result.png'):
     hsv = np.zeros((h, w, c), dtype=np.uint8)
     hsv[:, :, 0] = 255
     hsv[:, :, 2] = 255

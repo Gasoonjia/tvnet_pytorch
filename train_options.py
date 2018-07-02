@@ -21,7 +21,7 @@ class arguments():
         self.argparser.add_argument('--lbda', type=float, default=0.15, help='weight parameter for the data term')    
         self.argparser.add_argument('--theta', type=float, default=0.3, help='weight parameter for (u - v)^2')    
         self.argparser.add_argument('--n_warps', type=int, default=1, help='number of warpings per scale')
-        self.argparser.add_argument('--n_iters', type=int, default=50, help='maximum number of iterations for optimization')
+        self.argparser.add_argument('--n_iters', type=int, default=30, help='maximum number of iterations for optimization')
         self.argparser.add_argument('--demo', help="just demo with original weights", action="store_true")
 
     def parse(self):

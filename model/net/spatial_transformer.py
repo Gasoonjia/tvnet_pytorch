@@ -87,9 +87,9 @@ class spatial_transformer(nn.Module):
         y_s_flat = y_s.view(-1)
 
         input_transformed = self._interpolate(input_dim, x_s_flat, y_s_flat, out_size)
+        input_transformed = input_transformed.view(num_batch, out_height, out_width, num_channels).permute(0, 3, 1, 2)
 
-        output = Variable(input_transformed.view(num_batch, num_channels, out_height, out_width))
-
+        output = Variable(input_transformed)
         return output
     
     def _meshgrid(self, height, width):
@@ -144,6 +144,7 @@ class spatial_transformer(nn.Module):
         idx_c = base_y0 + x1
         idx_d = base_y1 + x1
 
+        im = im.permute(0, 2, 3, 1)
         im_flat = im.view(-1, channels).float()
         Ia = torch.index_select(im_flat, dim=0, index=Variable(idx_a.long()))
         Ib = torch.index_select(im_flat, dim=0, index=Variable(idx_b.long()))

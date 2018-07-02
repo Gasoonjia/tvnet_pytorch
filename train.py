@@ -30,7 +30,7 @@ if __name__ == '__main__':
                 print(n_epoch + 1)
     
     for data in dataloader:
-        u1, u2 = model.forward(data[0], data[1], need_result=True)
+        u1, u2, x2_warp = model.forward(data[0], data[1], need_result=True)
 
     _, c, h, w = args.data_size
     u1_np = np.squeeze(u1.detach().cpu().data.numpy())
@@ -45,3 +45,6 @@ if __name__ == '__main__':
     sio.savemat(res_mat_path, {'flow': flow_mat})
     if args.visualize:
         save_flow_to_img(flow_mat, h, w, c)
+    save_im_tensor(x2_warp.data, 'result/x2_warp.png')
+    save_im_tensor(data[0], 'result/x1.png')
+    save_im_tensor(data[1], 'result/x2.png')

@@ -12,7 +12,7 @@ class frame_dataset(data.Dataset):
         self.frame_addr = np.asarray([os.path.join(self.frame_dir, addr) for addr in os.listdir(self.frame_dir)])
         self.frame_addr.sort()
         self.to_tensor = get_transfrom()
-        self.img_size = Image.open(self.frame_addr[0]).convert('RGB').size
+        self.img_size = Image.open(self.frame_addr[0]).convert('RGB').size[::-1]
     
     def __len__(self):
         return self.frame_addr.shape[0] - 1

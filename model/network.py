@@ -26,9 +26,9 @@ class model(nn.Module):
     def forward(self, x1, x2, need_result=False):
         x1, x2 = Variable(x1), Variable(x2)
         u1, u2, rho = self.flow_net(x1, x2)
-        self.loss = self.flow_loss(u1, u2, x1, x2)
+        self.loss, x2_warp = self.flow_loss(u1, u2, x1, x2)
         if need_result:
-            return u1, u2
+            return u1, u2, x2_warp
     
     def optimize(self):
         self.flow_optmizer.zero_grad()
