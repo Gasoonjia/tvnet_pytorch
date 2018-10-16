@@ -40,7 +40,7 @@ class flow_loss(nn.Module):
         theta = theta.transpose(1, 2).contiguous().view(x.size(0), x.size(2), x.size(3), 2)
         theta += Variable(meshgrid(x.size(2), x.size(3), x.size(0))).cuda().float()
 
-        trans_image = F.grid_sample(x, theta, (x.size(2), x.size(3)))
+        trans_image = F.grid_sample(x, theta)
 
         return trans_image
     
